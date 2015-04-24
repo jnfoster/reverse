@@ -1,0 +1,15 @@
+#use "ast.ml";;
+
+#use "machine.ml";;
+
+#use "compiler.ml";;
+
+let plus = Plus (Int 4, Plus (Int 9, Int 5));;
+
+let vars = Let ("x", Int 4, Let ("y", Int 5, (Plus (Var "x", 
+Plus (Int 9, Var "y")))));;
+
+let more_vars = Let ("x", Int 1, Let ("y", Plus (Var "x", Int 3), 
+Plus (Int 9, Var "y")))
+
+let var_unused = Let ("x", Int 4, Let ("y", Int 5, (Plus (Var "x", Int 2))))
