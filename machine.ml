@@ -1,10 +1,13 @@
-type ops = Push of int | Add | Roll of int
+type operation = Push of int | Add | Roll of int | Apply
+                 | Form_Closure of operation list
 
-let eval_stack ops =
-  let eval_op stack op =
+type stack = Integer of int | Closure of operation list * stack list
+
+let rec eval_stack (s: stack list) (ops:operation list) =
+  let eval_op (stack: stack list) (op: operation) =
     match (stack, op) with
-    | (_, Push i) -> i::stack
-    | (v1::v2::t, Add) -> (v1+v2)::t
+    | (_, Push i) -> (Integer i)::stack
+    | (Integer i1::Integer i2::t, Add) -> (Integer (i1+i2))::t
     | (_, Add) -> failwith "invalid add"
     | (_, Roll i) ->
        let (_, value, new_st) =
@@ -17,5 +20,9 @@ let eval_stack ops =
          match value with
          | None -> failwith "invalid roll"
          | Some num -> num::new_st
-       end in
-  List.fold_left eval_op [] ops
+       end
+    | (_, Form_Closure ops) -> (Closure (ops, stack))::stack
+    | (value::(Closure (opers, st))::t, Apply) ->
+       (eval_stack (value::st) opers) @ t
+    | (_, Apply) -> failwith "invalid apply" in
+  List.fold_left eval_op s ops
