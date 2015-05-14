@@ -1,5 +1,5 @@
 type operation = Push of int | Add | Roll of int | Apply
-                 | Form_Closure of operation list
+                 | Form_Closure of operation list * int
 
 type stack = Integer of int | Closure of operation list * stack list
 
@@ -21,8 +21,12 @@ let rec eval_stack (s: stack list) (ops:operation list) =
          | None -> failwith "invalid roll"
          | Some num -> num::new_st
        end
-    | (_, Form_Closure ops) -> (Closure (ops, stack))::stack
-    | (value::(Closure (opers, st))::t, Apply) ->
-       (eval_stack (value::st) opers) @ t
+    | (_, Form_Closure (ops, i)) -> 
+    let (local_stack, new_st, _) = 
+    List.fold_left (fun (ls, ns, pos) v ->
+  if pos <= i then (ls@[v], ns, pos+1) else (ls, ns@[v], pos+1)) ([], [], 1) s in
+    (Closure (ops, local_stack))::new_st
+    | (argument::(Closure (opers, st))::t, Apply) ->
+       (eval_stack (argument::st) opers) @ t
     | (_, Apply) -> failwith "invalid apply" in
   List.fold_left eval_op s ops
