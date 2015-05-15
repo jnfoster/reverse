@@ -1,53 +1,84 @@
 open Ast
+open Machine
 
 (* Pretty printing helper functions *)
-let print_ident x = 
+let print_ident x =
   Format.printf "%s" x
 
-let print_int n = 
+let print_int n =
   Format.printf "%d" n
 
-let print_binop p s x y = 
+let print_binop p s x y =
   Format.printf "@[<2>(";
   p x;
   Format.printf "@ %s@ " s;
   p y;
-  Format.printf ")@]" 
+  Format.printf ")@]"
 
-let print_lambda p x e = 
+let print_lambda p x e =
   Format.printf "@[<2>(lambda %s.@ " x;
   p e;
   Format.printf ")@]"
 
-let print_let p x e1 e2 = 
-  Format.printf "@[<2>let %s =@ " x; 
+let print_let p x e1 e2 =
+  Format.printf "@[<2>let %s =@ " x;
   p e1;
   Format.printf "@ in@ ";
   p e2;
   Format.printf "@]"
 
 (* Pretty print expression e *)
-let print_exp e = 
-  let rec loop e = 
-    match e with 
+let print_exp e =
+  let rec loop e =
+    match e with
       | Var x -> print_ident x
-      | App (l,r) -> print_binop loop "" l r 
+      | App (l,r) -> print_binop loop "" l r
       | Lam(x,e) -> print_lambda loop x e
-      | Let(x,e1,e2) -> print_let loop x e1 e2 
-      | Plus (l,r) -> print_binop loop "+" l r 
-      | Int n -> print_int n  in 
+      | Let(x,e1,e2) -> print_let loop x e1 e2
+      | Plus (l,r) -> print_binop loop "+" l r
+      | Int n -> print_int n  in
   Format.printf "@[";
   loop e;
   Format.printf "@]"
 
 (* Pretty print value v *)
-let print_val v = 
-  let rec loop v = 
-    match v with 
-      | VInt n -> 
+let print_val v =
+  let rec loop v =
+    match v with
+      | VInt n ->
         Format.printf "%d" n
-      | VClosure(_) -> 
-        Format.printf "<fun>" in 
+      | VClosure(_) ->
+        Format.printf "<fun>" in
+  Format.printf "@[";
+  loop v;
+  Format.printf "@]"
+
+let print_instrs (lst: operation list) =
+  let rec loop inst =
+    match inst with
+    | Push i -> Format.printf "Push %d" i
+    | Add -> Format.printf "Add"
+    | Roll i -> Format.printf "Roll %d" i
+    | Apply -> Format.printf "Apply"
+    | Form_Closure (ops, i) ->
+       Format.printf "Form_Closure ([";
+       let indexed = List.mapi (fun i x -> (i + 1, x)) ops in
+       let num_ops = List.length ops in
+       List.iter (fun (i,x) ->
+                  loop x;
+                  if i < num_ops
+                  then Format.printf "; " else ()) indexed;
+       Format.printf "], %d)" i in
+  List.iter (fun x -> loop x; Format.printf "\n") lst
+
+(* Pretty print value v *)
+let print_stack_val v =
+  let rec loop v =
+    match v with
+      | Int n ->
+        Format.printf "%d" n
+      | Closure _ ->
+        Format.printf "<fun>" in
   Format.printf "@[";
   loop v;
   Format.printf "@]"

@@ -1,1 +1,5 @@
-(lambda x . x) 42
+let x = 11 in
+let y = 9 in
+let f = (lambda z. (lambda x. x + y + z)) in
+let g = f 8 in
+g x
