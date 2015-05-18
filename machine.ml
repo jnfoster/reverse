@@ -1,10 +1,15 @@
 open Ast
 
+(** Stack machine instructions *)
 type operation = Push of int | Add | Roll of int | Apply
                  | Form_Closure of operation list * int
 
+(** Stack machine values *)
 type stack = Int of int | Closure of operation list * stack list
 
+
+(** Evaluates a list of instructions on the stack.
+    Effect of each instruction explained in documentation.pdf *)
 let rec eval_stack (s: stack list) (ops:operation list) : stack list =
   let eval_op (stack: stack list) ((op_num, op): int * operation) =
     match (stack, op) with

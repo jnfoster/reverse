@@ -1,8 +1,13 @@
 open Ast
 open Machine
 
+(** Used to maintain a representation of the stack *)
 type stack_repr = Const | Var of var
 
+(** Finds the location of the variable in the stack,
+    returns the stack with the variable removed and the
+    former location of the varible if it is found,
+    where locations are 1-indexed *)
 let find_var_loc (var: var) (s: stack_repr list) :
   (int option * stack_repr list) =
   let indexed = List.mapi (fun i x -> (i + 1,x)) s in
@@ -11,6 +16,11 @@ let find_var_loc (var: var) (s: stack_repr list) :
                   | None, Var w when w = var -> (Some i, new_st)
                   | _ -> (ind, new_st@[x])) (None, []) indexed
 
+
+(** Compiles an expression to stack machine instructions while
+    maintaining a stack representation to keep track of variable
+    locations. This function is explained in great detail in
+    documentation.pdf *)
 let rec to_stack (ops: operation list) (stack: stack_repr list) :
   (exp -> operation list * stack_repr list) =
   function
@@ -49,6 +59,10 @@ let rec to_stack (ops: operation list) (stack: stack_repr list) :
      (ops@roll_ops@[Form_Closure (proc_ops, List.length free_stack)],
       Const::new_st)
 
+(** Helper function to to_stack which prepares the stack for a
+    Form_Closure instruction by moving free variables referenced
+    in the body of the function to the bottom of the stack.
+    Explained in further detail in documentation.pdf *)
 and place_into_scope (e: exp) (orig_stack: stack_repr list)
                        (free_stack: stack_repr list)
                        (local_stack: stack_repr list)
@@ -82,4 +96,6 @@ and place_into_scope (e: exp) (orig_stack: stack_repr list)
   | Lam (v, e) ->
      place_into_scope e orig_stack free_stack ((Var v)::local_stack) ops
 
+
+(** Returns the list of stack machine instructions given an expression *)
 let compile s = fst (to_stack [] [] s)
