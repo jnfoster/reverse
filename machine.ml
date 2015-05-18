@@ -5,14 +5,12 @@ type operation = Push of int | Add | Roll of int | Apply
 
 type stack = Int of int | Closure of operation list * stack list
 
-exception InvalidOp of int
-
 let rec eval_stack (s: stack list) (ops:operation list) : stack list =
   let eval_op (stack: stack list) ((op_num, op): int * operation) =
     match (stack, op) with
     | (_, Push i) -> (Int i)::stack
     | (Int i1::Int i2::t, Add) -> (Int (i1+i2))::t
-    | (_, Add) -> raise (InvalidOp op_num)
+    | (_, Add) -> failwith "invalid add"
     | (_, Roll i) ->
        let (_, value, new_st) =
          List.fold_left (fun (count, value, st) x ->
@@ -22,7 +20,7 @@ let rec eval_stack (s: stack list) (ops:operation list) : stack list =
                         (1, None, []) stack in
        begin
          match value with
-         | None -> raise (InvalidOp op_num)
+         | None -> failwith "invalid roll"
          | Some num -> num::new_st
        end
     | (_, Form_Closure (ops, i)) ->
@@ -35,5 +33,5 @@ let rec eval_stack (s: stack list) (ops:operation list) : stack list =
        else (Closure (ops, local_stack))::new_st
     | (argument::(Closure (opers, st))::t, Apply) ->
        (eval_stack (argument::st) opers) @ t
-    | (_, Apply) -> raise (InvalidOp op_num) in
+    | (_, Apply) -> failwith "invalid apply" in
   List.fold_left eval_op s (List.mapi (fun i x -> (i+1, x)) ops)

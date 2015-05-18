@@ -1,0 +1,185 @@
+\documentclass[11pt]{article}
+% decent example of doing mathematics and proofs in LaTeX.
+% An Incredible degree of information can be found at
+% http://en.wikibooks.org/wiki/LaTeX/Mathematics
+
+% Use wide margins, but not quite so wide as fullpage.sty
+\marginparwidth 0.5in 
+\oddsidemargin 0.25in 
+\evensidemargin 0.25in 
+\marginparsep 0.25in
+\topmargin 0.25in 
+\textwidth 6in \textheight 8 in
+% That's about enough definitions
+
+\usepackage{amsmath}
+\usepackage{upgreek}
+\usepackage{enumerate}
+\usepackage{graphicx}
+\usepackage{enumitem}
+\usepackage{amssymb}
+\usepackage{array}
+\newcolumntype{P}[1]{>{\centering\arraybackslash}p{#1}}
+\usepackage{multirow,bigdelim}
+
+\begin{document}
+\title{Linear Lambda Calculus Compiler Documentation}
+\author{CS 4999: Anna Yesypenko Supervised by Professor Nate Foster}
+\maketitle
+
+\section*{Overview:}
+
+Given a linear lambda calculus expression, the compiler translates the expression to stack machine instructions. Once the set of instructions have been produced, the expression can be evaluated to a value $\texttt{<val>}$, which can either be an integer $\texttt{<i>}$ or a function closure $\texttt{<closure>}$. 
+
+\medskip
+The following grammar defines an expression $\texttt{exp}$, where $\texttt{<var>}$ is a string that represents a value.
+
+\vspace{5mm}
+
+$\texttt{exp ::= <i>}$
+
+\hspace{12 mm} $\texttt {| <var>}$ 
+
+\hspace{12 mm} $\texttt {| <exp> + <exp>}$ 
+
+\hspace{12 mm} $\texttt{| let <var> = <exp> in <exp>}$
+
+\hspace{12 mm} $\texttt {| (}$ $\lambda$ $\texttt{<var>. <exp>)}$ 
+
+\hspace{12 mm} $\texttt{| <exp> <exp>}$
+
+\vspace{5mm}
+
+The compiler assumes that expressions are well-typed. In expressions of the form $\texttt {<exp> + <exp>}$, the expressions added must evaluate to integers. Expressions of the form $\texttt{<exp> <exp>}$ are assumed to be valid function applications. Since the language is linear, each variable is assumed to be used exactly once.
+
+\section*{Stack Machine Instruction Set:}
+
+\begin{center}
+  \begin{tabular}{|P{2.5cm}|P{2.5cm}|P{2.5cm}|}
+    \cline{0-0} \cline{3-3}
+    &&\\ 
+    &&\\
+    &&\\
+    $s_0$ & $- \texttt{  Push <i>} \rightarrow$ & $s_0$ \\
+    &&\\
+    &&\\ \cline{3-3}
+    && $\texttt{<i>}$ \\
+    \cline{0-0} \cline{3-3}
+  \end{tabular}
+\end{center}
+
+$\texttt{  Push <i>}$ simply pushes an integer to the bottom of the stack.
+
+\begin{center}
+  \begin{tabular}{|P{2.5cm}|P{2.5cm}|P{2.5cm}|}
+    \cline{0-0} \cline{3-3}
+    &&\\ 
+    &&\\
+    &&\\
+    $s_0$ & $- \texttt{  Add} \rightarrow$ & $s_0$ \\
+    &&\\ 
+    \cline{0-0} $\texttt{<i>}$&&\\ \cline{3-3}
+    \cline{0-0} $\texttt{<i>}$&& $\texttt{<i> + <i>}$ \\
+    \cline{0-0} \cline{3-3}
+  \end{tabular}
+\end{center}
+
+$\texttt{  Add}$ pops the two integers at the bottom of the stack, adds them, and pushes the result to the stack.
+
+\begin{center}
+  \begin{tabular}{P{2.5cm}|P{2.5cm}|P{2.5cm}|P{2.5cm}|}
+    \cline{2-2} \cline{4-4}
+    &&&\\ 
+    &$s_0$&&$s_0$\\
+    &&&\\ \cline{2-2}\cline{4-4}
+    \ldelim\{{4}{3cm}[\texttt{<i>} elements] &\texttt{<val>} & $- \texttt{  Roll <i>} \rightarrow$ & \\ \cline{2-2}
+    &&&$s_1$\\ 
+    &$s_1$&&\\ \cline{4-4}
+    &&& $\texttt{<value>}$ \\
+    \cline{2-2} \cline{4-4}
+  \end{tabular}
+\end{center}
+
+$\texttt{  Roll <i>}$ removes the $\texttt{<i>}^{th}$ element, where the elements are 1-indexed, from the stack and pushes it to the stack. $\texttt{Roll 1}$ makes no changes to the stack.
+
+\begin{center}
+  \begin{tabular}{P{2.5cm}|P{2.5cm}|P{6cm}|P{2.5cm}|}
+    \cline{2-2} \cline{4-4}
+    &&&\\ 
+    &&&\\
+    &$s_0$&$\texttt{Form\_Closure}$&\\
+    && $- \texttt{  (<instruction list>,  <i>)} \rightarrow$ & $s_0$\\ \cline{2-2}
+    \ldelim\{{3}{3cm}[\texttt{<i>} elements]&&&\\ 
+    &$s_1$&&\\ \cline{4-4}
+    &&& \texttt{<closure>} \\
+    \cline{2-2} \cline{4-4}
+  \end{tabular}
+\end{center}
+
+$\texttt{  Form\_Closure (<instruction list>,  <i>)}$ removes the bottom $\texttt{<i>}$ elements from the stack. These elements, along with the instruction list, form the closure pushed to the stack.
+
+\begin{center}
+  \begin{tabular}{|P{2.5cm}|P{2.5cm}|P{2.5cm}|P{1cm}|P{2.5cm}|}
+    \cline{1-1} \cline{3-3} \cline{5-5}
+    &&&&\\ 
+    &&$s_0$&&\\
+    $s_0$&&&&\\ \cline{3-3}
+    & $- \texttt{  Apply} \rightarrow$ &&  $\rightarrow$ & $s_0$\\ 
+    &&$s_{closure}$&&\\ \cline{1-1}
+    $\texttt{<closure>}$&&&&\\ \cline{1-1}\cline{3-3}\cline{5-5}
+    $\texttt{<val>}$&&\texttt{<val>}&& \texttt{<val>} \\
+    \cline{1-1} \cline{3-3} \cline{5-5}
+  \end{tabular}
+\end{center}
+
+$\texttt{Apply}$ assumes that the bottom values of the stack are a closure and the argument to the function. Recall that a closure contains some small stack $s_{closure}$ of values and a list of instructions. $\texttt{Apply}$ pushes these values onto the stack, then executes a $\texttt{Roll <i>}$ instruction, where $\texttt{<i>}$ is the number of values in $s_1{closure}$, placing the argument to the function at the bottom of the stack.
+
+Then, $\texttt{Apply}$ executes the list of instructions. Because of linear constraints, the stack at the end of an $\texttt{Apply}$ instruction should be the same as at the beginning of the instruction, except the closure and its argument are replaced with the result of the function application.
+
+\section*{Translation to Stack Machine Instructions:}
+
+Translation from expression $\texttt{exp}$ to stack machine instructions occurs through a series of recursive calls to the function $\texttt{to\_stack}$. Through each call, the list of instructions is updated. The compiler also maintains a representation of the stack (to keep track of the location of variables $\texttt{<var>}$, which have string identifiers, and constants $\texttt{<const>}$ but not their values). As an instruction is added, the compiler's representation of the stack updates. What follows explains the behavior of the recursive function $\texttt{to\_stack}$ depending on the expression.
+
+\vspace{5mm}
+
+$\texttt{exp ::= <i>}$ adds a $\texttt{Push <i>}$ operation to the list of instructions. The compiler pushes $\texttt{<const>}$ to its stack representation.
+
+\medskip
+
+\hspace{10mm}$\texttt{| <var>}$ determines the location of the variable in the stack representation then adds a $\texttt{Roll <i>}$ operation to the instructions such that the variable is placed at the bottom of the stack. The stack representation is appropriately updated after removing the variable from its old location.
+
+\medskip
+
+\hspace{10mm}$\texttt{| <exp> + <exp>}$ recursively calls $\texttt{to\_stack}$ for each expression, then adds $\texttt{Add}$ to the instruction list. Then, the compiler pops the bottom two elements of the stack representation and pushes $\texttt{<const>}$.
+
+\medskip
+
+\hspace{10mm}$\texttt{| let <var> = <exp> in <exp>}$ recursively calls $\texttt{to\_stack}$ for the first expression, then pops the bottom value in the stack representation and pushes $\texttt{<var>}$. Then, the compiler calls $\texttt{to\_stack}$ for the second expression.
+
+\medskip
+
+\hspace{10mm}$\texttt {| (}$ $\lambda$ $\texttt{<var>. <exp>)}$ first statically determines which of the free variables in the stack are used in $\texttt{<exp>}$. A helper function recurses through the expression, maintaining the original stack $s_0$, a stack of free variables $s_{closure}$ used from the original stack, and a stack of local variables $s_{local}$ introduced in the expression (let-expressions and arguments to lambdas introduce local variables). 
+
+Each time a variable is referenced, the compiler searches $s_{local}$ and $s_{closure}$ for it. In the case that is not found, a $\texttt{Roll <i>}$ is added to the instruction list and the variable is removed from the original stack $s_0$ and placed on $s_{closure}$.
+
+The motivation behind shifting these referenced free variables to the bottom of the stack is to prepare the stack for a $\texttt{Form\_Closure (<instruction list>,  <i>)}$ instruction. The bottom $\texttt{<i>}$ values are free variables referenced in the body of the lambda. Because of linear constraints, free variables referenced in the body must be removed from the stack $s_0$ to enforce the constraint that each variable is used exactly once.
+
+After statically determining the free variables the function body uses and maneuvering them into place at the bottom of the stack, $\texttt{to\_stack}$ is called on the body of the lambda with $s_{closure}$ as the stack and the argument to the function at the bottom of $s_{closure}$. The list of instructions produced assumes that the free variables will be particular positions at the bottom of the stack, which is an assumption that holds when the function is applied. 
+
+Finally, a $\texttt{Form\_Closure (<instruction list>,  <i>)}$ instruction with the instruction list and the number of elements in $s_{closure}$ is produced. In addition, the free variables present in $s_{closure}$, which are at the bottom of the stack, are removed from the stack representation.
+
+\medskip
+
+\hspace{10mm}$\texttt{| <exp> <exp>}$ recursively calls $\texttt{to\_stack}$ for both expressions and adds $\texttt{Apply}$ to the list of instructions. Then the compiler pops two values in the stack representation and pushes $\texttt{<const>}$, which represents the result of function application.
+
+\medskip
+
+\section*{Further Aims:}
+
+In many situations, it may be useful to define two functions, where one performs the inverse operation of the other. However, if you change one function, you will have to maintain the other such that they are still inverses. Though seemingly simple, this task can be tedious and difficult to debug for a programmer. 
+
+\medskip
+
+Thankfully, because of the linear constraints of the language, one should be able to compile a function in linear lambda calculus to instructions and reverse them to define an inverse function, which given the result of a function application should be able to produce the original argument. The beginning of the next semester of my research will involve implementing a bidirectional programming language and exploring its applications.
+
+\end{document}

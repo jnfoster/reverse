@@ -35,7 +35,7 @@ let () =
   (* (5) Pretty print the final value *)
   let v = match Machine.eval_stack [] instr with
     | [h] -> h
-    | _ -> failwith "nonlinear" in
+    | _ -> failwith "unused variable on stack" in
   let _ =
     Format.printf "\n Result:@\n  @[";
     Pprint.print_stack_val v;
