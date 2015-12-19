@@ -1,0 +1,2 @@
+let a = 10 in
+(lambda x. let y = x + a in y)

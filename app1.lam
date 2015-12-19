@@ -1,0 +1,2 @@
+(lambda x. (lambda y. (lambda z.
+x + y + z)))

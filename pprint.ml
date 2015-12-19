@@ -53,32 +53,33 @@ let print_val v =
   loop v;
   Format.printf "@]"
 
-let print_instrs (lst: operation list) =
+(* Pretty print program *)
+let print_instrs (lst: program) =
   let rec loop inst =
     match inst with
     | Push i -> Format.printf "Push %d" i
     | Add -> Format.printf "Add"
     | Roll i -> Format.printf "Roll %d" i
     | Apply -> Format.printf "Apply"
-    | Form_Closure (ops, i) ->
-       Format.printf "Form_Closure ([";
-       let indexed = List.mapi (fun i x -> (i + 1, x)) ops in
-       let num_ops = List.length ops in
-       List.iter (fun (i,x) ->
-                  loop x;
-                  if i < num_ops
-                  then Format.printf "; " else ()) indexed;
-       Format.printf "], %d)" i in
+    | Form_Closure (num_ops, num_vals) ->
+       Format.printf "Form_Closure (%d, %d)" num_ops num_vals in
   List.iter (fun x -> loop x; Format.printf "\n") lst
 
-(* Pretty print value v *)
+(* Pretty print stack value *)
 let print_stack_val v =
   let rec loop v =
     match v with
       | Int n ->
-        Format.printf "%d" n
+        Format.printf "%d " n
       | Closure _ ->
-        Format.printf "<fun>" in
+        Format.printf "<fun> " in
   Format.printf "@[";
   loop v;
   Format.printf "@]"
+
+(* Pretty print stack *)
+let print_stack s = 
+  Format.printf "top [ ";
+  List.iter (fun x -> print_stack_val x) s;
+  Format.printf "] bottom\n"
+

@@ -2,41 +2,19 @@ open Ast
 
 (** Stack machine instructions *)
 type operation = Push of int | Add | Roll of int | Apply
-                 | Form_Closure of operation list * int
+                 | Form_Closure of int * int
+type program = operation list
 
 (** Stack machine values *)
-type stack = Int of int | Closure of operation list * stack list
+type stack_value = Int of int | Closure of program * stack
+and stack = stack_value list
 
+(** Used to maintain a representation of the stack *)
+type value_repr = Const | Stack_Var of var
+type stack_repr = value_repr list
 
-(** Evaluates a list of instructions on the stack.
-    Effect of each instruction explained in documentation.pdf *)
-let rec eval_stack (s: stack list) (ops:operation list) : stack list =
-  let eval_op (stack: stack list) ((op_num, op): int * operation) =
-    match (stack, op) with
-    | (_, Push i) -> (Int i)::stack
-    | (Int i1::Int i2::t, Add) -> (Int (i1+i2))::t
-    | (_, Add) -> failwith "invalid add"
-    | (_, Roll i) ->
-       let (_, value, new_st) =
-         List.fold_left (fun (count, value, st) x ->
-                         if count = i
-                         then (count + 1, Some x, st)
-                         else (count + 1, value, st@[x]))
-                        (1, None, []) stack in
-       begin
-         match value with
-         | None -> failwith "invalid roll"
-         | Some num -> num::new_st
-       end
-    | (_, Form_Closure (ops, i)) ->
-       let (local_stack, new_st, _) =
-         List.fold_left (fun (ls, ns, pos) v ->
-                         if pos <= i then (ls@[v], ns, pos+1)
-                         else (ls, ns@[v], pos+1)) ([], [], 1) stack in
-       if (List.length local_stack) <> i
-       then failwith "invalid form closure"
-       else (Closure (ops, local_stack))::new_st
-    | (argument::(Closure (opers, st))::t, Apply) ->
-       (eval_stack (argument::st) opers) @ t
-    | (_, Apply) -> failwith "invalid apply" in
-  List.fold_left eval_op s (List.mapi (fun i x -> (i+1, x)) ops)
+(** Maintains history of applying non-injective functions *)
+type history_tape = int list
+
+(** Tuple of program input, stack, history_tape, program history *)
+type machine_state = program * stack * history_tape * program

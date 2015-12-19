@@ -19,7 +19,7 @@ prog : exp EOF                     { $1 }
 exp : LET VAR EQUALS exp IN exp    { Let($2,$4,$6) }
     | lexp                         { $1 }
 
-lexp : LAMBDA VAR DOT lexp         { Lam ($2,$4) }
+lexp : LAMBDA VAR DOT exp         { Lam ($2,$4) }
     | oexp                         { $1 }
  
 oexp : oexp PLUS appexp            { Plus($1,$3) }
