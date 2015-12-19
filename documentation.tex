@@ -4,10 +4,10 @@
 % http://en.wikibooks.org/wiki/LaTeX/Mathematics
 
 % Use wide margins, but not quite so wide as fullpage.sty
-\marginparwidth 0.5in 
-\oddsidemargin 0.25in 
-\evensidemargin 0.25in 
-\marginparsep 0.25in
+\marginparwidth0.5in 
+\oddsidemargin0.25in 
+\evensidemargin0.25in 
+\marginparsep0.25in
 \topmargin 0.25in 
 \textwidth 6in \textheight 8 in
 % That's about enough definitions
@@ -18,9 +18,13 @@
 \usepackage{graphicx}
 \usepackage{enumitem}
 \usepackage{amssymb}
+\usepackage{mathtools}
 \usepackage{array}
 \newcolumntype{P}[1]{>{\centering\arraybackslash}p{#1}}
 \usepackage{multirow,bigdelim}
+
+\newcommand\myeq{\stackrel{\mathclap{\normalfont\mbox{def}}}{=}}
+
 
 \begin{document}
 \title{Linear Lambda Calculus Compiler Documentation}
@@ -44,7 +48,7 @@ $\texttt{exp ::= <i>}$
 
 \hspace{12 mm} $\texttt{| let <var> = <exp> in <exp>}$
 
-\hspace{12 mm} $\texttt {| (}$ $\lambda$ $\texttt{<var>. <exp>)}$ 
+\hspace{12 mm} $\texttt {| } \lambda \texttt{<var>. <exp>}$ 
 
 \hspace{12 mm} $\texttt{| <exp> <exp>}$
 
@@ -53,6 +57,25 @@ $\texttt{exp ::= <i>}$
 The compiler assumes that expressions are well-typed. In expressions of the form $\texttt {<exp> + <exp>}$, the expressions added must evaluate to integers. Expressions of the form $\texttt{<exp> <exp>}$ are assumed to be valid function applications. Since the language is linear, each variable is assumed to be used exactly once.
 
 \section*{Stack Machine Instruction Set:}
+
+An instruction can be any of the following:
+
+\medskip
+
+$\texttt{instr ::= Push <i> | Add | Roll <i> | Form\_Closure (<i>, <i>) | Apply}$
+
+\medskip
+
+The execution of each instruction modifies the stack, a list of $\texttt{stack\_value}$, defined as such:
+
+\medskip
+
+$\texttt{stack\_value ::= Int <i> | Closure(<instr list>, <stack\_value list>)}$
+
+\medskip
+
+In this documentation and the code, it is also useful to define $\texttt{program ::= instr list}$ and $\texttt{stack ::= stack\_value list}$. 
+
 
 \begin{center}
   \begin{tabular}{|P{2.5cm}|P{2.5cm}|P{2.5cm}|}
@@ -116,7 +139,8 @@ $\texttt{  Roll <i>}$ removes the $\texttt{<i>}^{th}$ element, where the element
   \end{tabular}
 \end{center}
 
-$\texttt{  Form\_Closure (<instruction list>,  <i>)}$ removes the bottom $\texttt{<i>}$ elements from the stack. These elements, along with the instruction list, form the closure pushed to the stack.
+$\texttt{  Form\_Closure (num\_ops : i,  num\_vals : i)}$ removes the bottom $\texttt{<num-vals>}$ values from the stack. Additionally, if we represent the program we are executing as a series of instructions $\texttt{Form\_Closure (<num\_ops, num\_vals), instr-1, instr-2, ..., instr-n}$, then the instructions $\texttt{intr-1, instr-2, ..., instr-{num\_ops}}$ are removed from the program and placed into the closure, and the program we are executing becomes\\
+$\texttt{instr-(num\_ops + 1), ..., instr-n}$. The values removed from the stack and the instructions removed from the program constitute the closure pushed to the stack.
 
 \begin{center}
   \begin{tabular}{|P{2.5cm}|P{2.5cm}|P{2.5cm}|P{1cm}|P{2.5cm}|}
@@ -124,7 +148,7 @@ $\texttt{  Form\_Closure (<instruction list>,  <i>)}$ removes the bottom $\textt
     &&&&\\ 
     &&$s_0$&&\\
     $s_0$&&&&\\ \cline{3-3}
-    & $- \texttt{  Apply} \rightarrow$ &&  $\rightarrow$ & $s_0$\\ 
+    & $- \texttt{  Apply} \rightarrow$ &&  $\rightarrow^*$ & $s_0$\\ 
     &&$s_{closure}$&&\\ \cline{1-1}
     $\texttt{<closure>}$&&&&\\ \cline{1-1}\cline{3-3}\cline{5-5}
     $\texttt{<val>}$&&\texttt{<val>}&& \texttt{<val>} \\
@@ -132,9 +156,8 @@ $\texttt{  Form\_Closure (<instruction list>,  <i>)}$ removes the bottom $\textt
   \end{tabular}
 \end{center}
 
-$\texttt{Apply}$ assumes that the bottom values of the stack are a closure and the argument to the function. Recall that a closure contains some small stack $s_{closure}$ of values and a list of instructions. $\texttt{Apply}$ pushes these values onto the stack, then executes a $\texttt{Roll <i>}$ instruction, where $\texttt{<i>}$ is the number of values in $s_1{closure}$, placing the argument to the function at the bottom of the stack.
+$\texttt{Apply}$ assumes that the bottom values of the stack are a closure and the argument to the function. Recall that a closure contains some small stack $s_{closure}$ of values and a list of instructions $p_{closure}$. Say $p$ is the program we are executing, then after executing $\texttt{Apply}$, we proceed to execute $p_{closure}\ @\ p$. Furthermore, $\texttt{Apply}$ pushes $s_{closure}$ onto the stack, then executes a $\texttt{Roll <i>}$ instruction, where $\texttt{<i>}$ is the number of values in $s_{closure}$, placing the argument to the function at the top of the stack.
 
-Then, $\texttt{Apply}$ executes the list of instructions. Because of linear constraints, the stack at the end of an $\texttt{Apply}$ instruction should be the same as at the beginning of the instruction, except the closure and its argument are replaced with the result of the function application.
 
 \section*{Translation to Stack Machine Instructions:}
 
@@ -162,24 +185,70 @@ $\texttt{exp ::= <i>}$ adds a $\texttt{Push <i>}$ operation to the list of instr
 
 Each time a variable is referenced, the compiler searches $s_{local}$ and $s_{closure}$ for it. In the case that is not found, a $\texttt{Roll <i>}$ is added to the instruction list and the variable is removed from the original stack $s_0$ and placed on $s_{closure}$.
 
-The motivation behind shifting these referenced free variables to the bottom of the stack is to prepare the stack for a $\texttt{Form\_Closure (<instruction list>,  <i>)}$ instruction. The bottom $\texttt{<i>}$ values are free variables referenced in the body of the lambda. Because of linear constraints, free variables referenced in the body must be removed from the stack $s_0$ to enforce the constraint that each variable is used exactly once.
+The motivation behind shifting these referenced free variables to the bottom of the stack is to prepare the stack for a $\texttt{Form\_Closure (num\_ops, num\_vars)}$ instruction. The bottom $\texttt{num\_vars}$ values are free variables referenced in the body of the lambda. Because of linear constraints, free variables referenced in the body must be removed from the stack $s_0$ to enforce the constraint that each variable is used exactly once.
 
 After statically determining the free variables the function body uses and maneuvering them into place at the bottom of the stack, $\texttt{to\_stack}$ is called on the body of the lambda with $s_{closure}$ as the stack and the argument to the function at the bottom of $s_{closure}$. The list of instructions produced assumes that the free variables will be particular positions at the bottom of the stack, which is an assumption that holds when the function is applied. 
 
-Finally, a $\texttt{Form\_Closure (<instruction list>,  <i>)}$ instruction with the instruction list and the number of elements in $s_{closure}$ is produced. In addition, the free variables present in $s_{closure}$, which are at the bottom of the stack, are removed from the stack representation.
+Finally, a $\texttt{Form\_Closure (num\_ops,  num\_vars)}$ instruction with the number of instructions that constitute a program of the function body and the number of elements in $s_{closure}$ is produced. In addition, the free variables present in $s_{closure}$, which are at the bottom of the stack, are removed from the stack representation.
 
 \medskip
 
 \hspace{10mm}$\texttt{| <exp> <exp>}$ recursively calls $\texttt{to\_stack}$ for both expressions and adds $\texttt{Apply}$ to the list of instructions. Then the compiler pops two values in the stack representation and pushes $\texttt{<const>}$, which represents the result of function application.
 
-\medskip
+\break{}
+
+\section*{Bidirectionality:}
+
+Suppose we have executed some program $\rho \in \texttt{program}$, which produces some value $v$ on the stack. Given a history of which instructions have been executed $\rho_h \in \texttt{program}$, where the head of the list is the most recent instruction, we can revert the stack to its original state before executing $\rho$ according to the following rules.
+
+Some instructions constitute non-injective functions $\sigma \rightarrow \sigma$, where $\sigma \in \texttt{stack}$. Therefore, we must introduce a history tape to maintain information about about the stack state when these instructions are executed. We call this history tape $\sigma_h \in \texttt{int list}$. The rules we present below show the bidirectionality for each instruction using the following tuple:
+\begin{align*}
+    (\rho \in \texttt{program}, \sigma \in \texttt{stack}, \sigma_h \in \texttt{int list}, \rho_h \in \texttt{program})
+\end{align*}
+
+Bidirectionality Rules:
+\begin{gather*}
+    (\texttt{Push}\ i::\rho, \sigma, \sigma_h, \rho_h)\\
+    \Longleftrightarrow (\rho, \texttt{Int}\ i::\sigma, \sigma_h, \texttt{Push}\ i::\rho_h) \\ \\
+    (\texttt{Add}::\rho, \texttt{Int}\ i_1::\texttt{Int}\ i_2::\sigma, \sigma_h, \rho_h)\\
+    \Longleftrightarrow (\rho, \texttt{Int}\ (i_1+i_2)::\sigma, i_1::\sigma_h, \texttt{Add}::\rho_h)\\ \\
+    (\texttt{Roll}\ i::\rho, v_1::v_2::\dots::v_i::\sigma, \sigma_h, \rho_h)\\
+    \Longleftrightarrow (\rho, v_i::v_1::\dots::v_{i-1}::\sigma, \sigma_h, \texttt{Roll}\ i::\rho_h)\\ \\
+    (\texttt{Form\_Closure}\ (num\_ops, num\_vals)::i_1::\dots::i_{num\_ops}::\rho, v_1::\dots::v_{num\_vals}::\sigma, \sigma_h, \rho_h) \\
+    \Longleftrightarrow (\rho, \sigma, \sigma_h, \texttt{Form\_Closure}\ (num\_ops, num\_vals)::\rho_h)\\ \\
+    (\texttt{Apply}::\rho, v::\texttt{Closure}\ (\hat{\rho}, \hat{\sigma})::\sigma, \sigma, \sigma_h, \rho_h) \\
+    \Longleftrightarrow (\hat{\rho}\ @\ \rho, \hat{\sigma}\ @\ \sigma, |\hat{\rho}|::|\hat{\sigma}|::\sigma_h, \texttt{Apply}::\rho_h)
+\end{gather*}
+
+Now we will discuss the non-injective functions and the approach to maintaining the history tape. When reversing an $\texttt{Add}$ instruction, one cannot uniquely determine two integers whose sum is is the integer at the top of the stack, therefore, when adding $\texttt{Int}\ i_1$ and $\texttt{Int} i_2$, we place $i_1$ onto the history since the function $(+) i_1$ is injective.
+
+Likewise, when reversing an $\texttt{Apply}$ operation, one cannnot uniquely determine which instructions belong in the closure and which stack values are used in the closure, therefore to restore $\texttt{Closure} (\hat{\rho}, \hat{\sigma})$, we must add the lengths of $\hat{\rho}$ and $\hat{\sigma}$ to the history tape upon executing an $\texttt{Apply}$ instruction.
 
 \section*{Further Aims:}
 
-In many situations, it may be useful to define two functions, where one performs the inverse operation of the other. However, if you change one function, you will have to maintain the other such that they are still inverses. Though seemingly simple, this task can be tedious and difficult to debug for a programmer. 
+The $\texttt{Apply}$ instruction may be injective because of the linear constraints in our language. Recall that in our stack-machine, we can define a well-formed closure, where all the local variables of the closure are consumed when executing the body of the closure, using the property $\texttt{wf}$.
+\begin{align*}
+    \vec{x} = (\hat{\rho}_x \in \texttt{program}, \hat{\sigma}_x \in \texttt{stack}, \rho_x \in \texttt{program}, \sigma_x \in \texttt{stack})\\
+    \texttt{wf}\ (\vec{x}, v \in \texttt{stack\_value}) \quad \myeq \quad (\texttt{Apply}::\rho, v::\texttt{Closure}\ (\hat{\rho}, \hat{\sigma})::\sigma, \dots) &\Longrightarrow\\
+    (\hat{\rho}\ @\ \rho, v::\hat{\sigma}\ @\ \sigma, \dots) &\Longrightarrow^* (\rho, v'::\sigma, \dots)
+\end{align*}
+Recall that to reverse $\texttt{Apply}$, we must split the program and the stack such that we restore the original closure. We define this split by the following:
+\begin{align*}
+    \texttt{splits}\ (\rho', \sigma', v, \vec{x}) \quad \myeq \quad \rho' = \hat{\rho}_x\ @\ \rho_x \wedge \sigma' = \hat{\sigma}_x\ @\ \sigma_x: \ \texttt{wf}\ (\vec{x}, v)
+\end{align*}
+Using the linear constraints of the language, if we could prove the following proposition, then $\texttt{Apply}$ would be injective.
+\begin{align*}
+    \texttt{Prop}: \quad \forall \rho', \sigma'.\ \exists\ \vec{x}\ \texttt{splits}\ (\rho', \sigma', \vec{x}) \wedge \exists\ \vec{y}\ \texttt{splits}\ (\rho', \sigma', \vec{y}) \Longrightarrow \vec{x} = \vec{y}
+\end{align*}
 
-\medskip
+The constraints placed on the language currently are not enough to prove $\texttt{Prop}$. We must require that every well-formed closure contains at least one instruction, because otherwise, a valid split of $\rho'$ would trivially always be $\rho' = \texttt{[]}\ @\ \rho'$.
 
-Thankfully, because of the linear constraints of the language, one should be able to compile a function in linear lambda calculus to instructions and reverse them to define an inverse function, which given the result of a function application should be able to produce the original argument. The beginning of the next semester of my research will involve implementing a bidirectional programming language and exploring its applications.
+Additionally, consider the following counterexample as to why $\texttt{Prop}$ may not hold. The body of the function $(\lambda x.\ \texttt{let}\ sum = x + 1\ \texttt{in}\ sum)$ translates to the following stack-machine instructions:
+\begin{align*}
+    \rho_c := \texttt{[Roll 1; Push 1; Add; Roll 1]}
+\end{align*}
 
+However, one could choose to emit the last instruction. Therefore, \\ $\texttt{Closure}\ (\texttt{[Roll 1; Push 1; Add]}, \texttt{[]})$ and $\texttt{Closure}\ (\rho_c, [])$ are both valid well-formed closures. Furthermore, $\texttt{Closure}\ (\texttt{[Roll 1]}, \texttt{[]})$ is also a well-formed closure. We could decide to remove $\texttt{Roll 1}$ altogether from all programs, but body of the identity function $(\lambda x.\ x)$ would only be representable as an empty program, which would violate our constraint that every closure must contain at least one instruction.
+
+Therefore, $\texttt{Prop}$ is currently not true under the current constaints of our stack-machine. A further aim of mine is adding constraints such that $\texttt{Prop}$ holds true. 
 \end{document}
