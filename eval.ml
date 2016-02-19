@@ -21,11 +21,16 @@ let rec eval (g:env) (e:exp) : value =
       eval g (App(Lam(x,e2), e1))
     | Int n ->
       VInt n
-    | Plus(e1,e2) ->
+    | Binop (op, e1,e2) ->
       begin
         match eval g e1, eval g e2 with
           | VInt n1, VInt n2 ->
-            VInt(n1 + n2)
+                  begin match op with 
+                  | Plus -> VInt(n1 + n2)
+                  | Minus -> VInt (n1 - n2)
+                  | Divide -> VInt (n1 / n2)
+                  | Multiply -> VInt (n1 * n2)
+                  end
           | _ ->
             raise IllformedExpression
       end
@@ -42,30 +47,46 @@ let split_list lst i =
         else (l1, l2@[x])) ([], []) (List.mapi (fun i x -> (x, i+1)) lst) in
     Some split
 
+(** Extracts the i-th element of the list (indexing starts at 1) 
+  * and places it at the head of the list *)
+let roll_list lst i =
+    match split_list lst (i-1) with 
+    | Some (l1, elem::l2) -> elem::(l1@l2)
+    | _ -> failwith "invalid roll"
+
+(** Takes the first element of the list and places it at the i-th position *)
+let unroll_list lst i = 
+      match split_list lst i with
+      | Some (elem::l1, l2) -> l1 @ [elem] @ l2
+      | _ -> failwith "invalid un-roll"
+
+
 
 
 (** Evaluates a list of instructions on the stack.
     Effect of each instruction explained in documentation.pdf *)
 let rec eval_stack (state: machine_state) : machine_state =
     let (input_prog, stack, history_tape, history_prog) = state in
-  (** Extracts the i-th element of the list (indexing starts at 1) 
-   * and places it at the head of the list *)
-  let roll_list lst i =
-    match split_list lst (i-1) with 
-    | Some (l1, elem::l2) -> elem::(l1@l2)
-    | _ -> failwith "invalid roll" in
-
   match (stack : stack), input_prog with 
   | _, (Push i as push)::t_ops ->  
       let s' = (Int i)::stack in 
       eval_stack (t_ops, s', history_tape, push::history_prog)
-  | Int i1::Int i2::t_stack, Add::t_ops -> 
-      let s' = Int (i1+i2)::t_stack in
-      eval_stack (t_ops, s', i1::history_tape, Add::history_prog)
-  | _, Add::t_ops -> failwith "invalid add"
+  | Int i1::Int i2::t_stack, ((Add | Mult | Div | Subt) as op)::t_ops -> 
+          let f = match op with 
+          | Add -> ( + )
+          | Mult -> ( * )
+          | Div -> ( / )
+          | Subt -> ( - )
+          | _ -> failwith "should not happen" in
+      let s' = Int (f i2 i1)::t_stack in
+      eval_stack (t_ops, s', i1::history_tape, op::history_prog)
+  | _, (Add|Mult|Div|Subt)::t_ops -> failwith "invalid binop"
   | _, (Roll i as roll)::t_ops ->
       let s' = roll_list stack i in
       eval_stack (t_ops, s', history_tape, roll:: history_prog)
+  | _, (Unroll i as unroll)::t_ops ->
+      let s' = unroll_list stack i in
+      eval_stack (t_ops, s', history_tape, unroll:: history_prog)
   | _, (Form_Closure (num_ops, num_vars) as fc)::t_ops ->
       begin 
         match split_list t_ops num_ops, split_list stack num_vars with
@@ -90,11 +111,6 @@ let rec eval_stack (state: machine_state) : machine_state =
   let reverse_history (program, stack, history_tape, history_prog) = 
     (* Makes the top element of the stack the i-th element,
      * where the stack indexing starts at 1 *)
-    let unroll_list lst i = 
-      match split_list lst i with 
-      | Some (ith::l1, l2) -> l1@[ith]@l2
-      | _ -> failwith "invalid un-roll" in
-
     let reverse (p, s, h_t) op  =
       match (op, s, h_t) with 
       | Push i as push, Int v::s, _ when i = v -> (push::p, s, h_t)
@@ -102,9 +118,18 @@ let rec eval_stack (state: machine_state) : machine_state =
       | Roll i as roll, _, _ -> 
           let s' = unroll_list s i in
           (roll::p, s', h_t)
-      | Add, Int sum::s, n1::h_t ->
-          (Add::p, Int n1::Int (sum - n1)::s, h_t)
-      | Add, _, _ -> failwith "invalid un-add"
+      | Unroll i as unroll, _, _ ->
+              let s' = roll_list s i in
+              (unroll::p, s', h_t)
+      | ((Add | Mult | Div | Subt) as binop), Int result::s, n1::h_t ->
+              let inv_f = match binop with
+              | Add -> ( - )
+              | Subt -> ( + )
+              | Div -> ( * )
+              | Mult -> ( / ) 
+              | _ -> failwith "should not happen" in
+          (binop::p, Int n1::Int (inv_f result n1)::s, h_t)
+      | (Add | Mult | Div | Subt), _, _ -> failwith "invalid un-binop"
       | Form_Closure(num_ops, num_vars) as fc, Closure(local_p, local_s)::s, _ ->
           (fc::local_p@p, local_s@s, h_t)
       | Form_Closure _, _, _ ->

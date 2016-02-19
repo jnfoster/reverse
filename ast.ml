@@ -1,12 +1,14 @@
 type var = string
 
+type binop = Plus | Minus | Divide | Multiply
+
 type exp =
     Var of var
   | App of exp * exp
   | Lam of var * exp
   | Let of var * exp * exp
   | Int of int
-  | Plus of exp * exp
+  | Binop of binop * exp * exp
 
 exception UnboundVariable of var
 
@@ -25,9 +27,3 @@ let lookup (g:env) (x:var) : value =
 let extend (g:env) (x:var) (v:value) : env = 
   (fun y -> if x = y then v else g y)     
 
-(* TODO: 
-   - define stack machine program syntax 
-   - extend eval to run stack program
-   - define compiler from exp to stack program
-   - extend main to evaluate via stacks
-*)

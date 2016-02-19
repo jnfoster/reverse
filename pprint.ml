@@ -35,7 +35,10 @@ let print_exp e =
       | App (l,r) -> print_binop loop "" l r
       | Lam(x,e) -> print_lambda loop x e
       | Let(x,e1,e2) -> print_let loop x e1 e2
-      | Plus (l,r) -> print_binop loop "+" l r
+      | Binop (Plus, l,r) -> print_binop loop "+" l r
+      | Binop (Minus, l,r) -> print_binop loop "-" l r
+      | Binop (Multiply, l,r) -> print_binop loop "*" l r
+      | Binop (Divide, l,r) -> print_binop loop "/" l r
       | Int n -> print_int n  in
   Format.printf "@[";
   loop e;
@@ -59,7 +62,11 @@ let print_instrs (lst: program) =
     match inst with
     | Push i -> Format.printf "Push %d" i
     | Add -> Format.printf "Add"
+    | Subt -> Format.printf "Subt"
+    | Mult -> Format.printf "Mult"
+    | Div -> Format.printf "Div"
     | Roll i -> Format.printf "Roll %d" i
+    | Unroll i -> Format.printf "Unroll %d" i
     | Apply -> Format.printf "Apply"
     | Form_Closure (num_ops, num_vals) ->
        Format.printf "Form_Closure (%d, %d)" num_ops num_vals in

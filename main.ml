@@ -57,7 +57,7 @@ let () =
       (e', repr', input_num + 1)) init_stack (parsed_exp, [], 1) in
 
   (* (6) Translate the expression  to machine instructions *)
-  let program = Translation.translate init_stack_repr e in
+  let program = Compiler.translate init_stack_repr e in
   let _ =
     Format.printf "Translated expression into machine instructions...@\n";
     Format.print_flush ();

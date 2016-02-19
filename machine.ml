@@ -1,7 +1,7 @@
 open Ast
 
 (** Stack machine instructions *)
-type operation = Push of int | Add | Roll of int | Apply
+type operation = Push of int | Add | Subt | Mult | Div | Roll of int | Apply | Unroll of int
                  | Form_Closure of int * int
 type program = operation list
 

@@ -20,6 +20,9 @@ rule token = parse
 | ws      { token lexbuf }
 | '\n'    { incline lexbuf; token lexbuf }
 | "+"     { PLUS }
+| "/"     { DIVIDE }
+| "-"     { MINUS }
+| "*"     { MULTIPLY }
 | "("     { LPAREN }
 | ")"     { RPAREN }
 | "."     { DOT }
