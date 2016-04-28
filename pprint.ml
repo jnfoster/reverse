@@ -72,11 +72,21 @@ let print_instrs (lst: program) =
        Format.printf "Form_Closure (%d, %d)" num_ops num_vals in
   List.iter (fun x -> loop x; Format.printf "\n") lst
 
+(* Pretty print stack *)
+let print_stack_repr s = 
+    let rec print_repr = function
+        | Const -> Format.printf "Const"
+        | Stack_Var v -> Format.printf "Var %s" v in
+  Format.printf "top [ ";
+  List.iter (fun x -> print_repr x; Format.printf "\n") s;
+  Format.printf "] bottom\n"
+
+
 (* Pretty print stack value *)
 let print_stack_val v =
   let rec loop v =
     match v with
-      | Int n ->
+      | Stack_Int n ->
         Format.printf "%d " n
       | Closure _ ->
         Format.printf "<fun> " in

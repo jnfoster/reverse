@@ -19,7 +19,7 @@ let () =
           with Failure "int_of_string" -> 
             Format.printf "Argument to function must be an integer\n";
             exit 0 in
-        (Int parsed)::stack
+        (Stack_Int parsed)::stack
       else stack) [] args in
 
   let _ =

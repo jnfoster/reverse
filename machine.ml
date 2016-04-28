@@ -6,7 +6,7 @@ type operation = Push of int | Add | Subt | Mult | Div | Roll of int | Apply | U
 type program = operation list
 
 (** Stack machine values *)
-type stack_value = Int of int | Closure of program * stack
+type stack_value = Stack_Int of int | Closure of program * stack
 and stack = stack_value list
 
 (** Used to maintain a representation of the stack *)

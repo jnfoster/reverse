@@ -1,3 +1,4 @@
+open Common
 open Ast
 open Machine
 exception IllformedExpression
@@ -34,34 +35,6 @@ let rec eval (g:env) (e:exp) : value =
           | _ ->
             raise IllformedExpression
       end
-      
-      
-(** Given a list of size n, returns a pair of lists, one of 
- * size i and other other of size n - i; None if there is no such split *)
-let split_list lst i = 
-  if List.length lst < i then None
-  else 
-    let split = 
-      List.fold_left (fun (l1, l2) (x, pos) ->
-        if pos <= i then (l1@[x], l2)
-        else (l1, l2@[x])) ([], []) (List.mapi (fun i x -> (x, i+1)) lst) in
-    Some split
-
-(** Extracts the i-th element of the list (indexing starts at 1) 
-  * and places it at the head of the list *)
-let roll_list lst i =
-    match split_list lst (i-1) with 
-    | Some (l1, elem::l2) -> elem::(l1@l2)
-    | _ -> failwith "invalid roll"
-
-(** Takes the first element of the list and places it at the i-th position *)
-let unroll_list lst i = 
-      match split_list lst i with
-      | Some (elem::l1, l2) -> l1 @ [elem] @ l2
-      | _ -> failwith "invalid un-roll"
-
-
-
 
 (** Evaluates a list of instructions on the stack.
     Effect of each instruction explained in documentation.pdf *)
@@ -69,17 +42,17 @@ let rec eval_stack (state: machine_state) : machine_state =
     let (input_prog, stack, history_tape, history_prog) = state in
   match (stack : stack), input_prog with 
   | _, (Push i as push)::t_ops ->  
-      let s' = (Int i)::stack in 
+      let s' = (Stack_Int i)::stack in 
       eval_stack (t_ops, s', history_tape, push::history_prog)
-  | Int i1::Int i2::t_stack, ((Add | Mult | Div | Subt) as op)::t_ops -> 
+  | Stack_Int i1::Stack_Int i2::t_stack, ((Add | Mult | Div | Subt) as op)::t_ops -> 
           let f = match op with 
           | Add -> ( + )
           | Mult -> ( * )
           | Div -> ( / )
           | Subt -> ( - )
           | _ -> failwith "should not happen" in
-      let s' = Int (f i2 i1)::t_stack in
-      eval_stack (t_ops, s', i1::history_tape, op::history_prog)
+      let s' = Stack_Int (f i1 i2)::t_stack in
+      eval_stack (t_ops, s', i2::history_tape, op::history_prog)
   | _, (Add|Mult|Div|Subt)::t_ops -> failwith "invalid binop"
   | _, (Roll i as roll)::t_ops ->
       let s' = roll_list stack i in
@@ -113,22 +86,23 @@ let rec eval_stack (state: machine_state) : machine_state =
      * where the stack indexing starts at 1 *)
     let reverse (p, s, h_t) op  =
       match (op, s, h_t) with 
-      | Push i as push, Int v::s, _ when i = v -> (push::p, s, h_t)
-      | Push _, _, _ -> failwith "invalid un-push"
+      | Push i as push, Stack_Int v::s, _ when i = v -> (push::p, s, h_t)
+      | Push _, Stack_Int v::s, _ -> failwith "invalid un-push"
+      | Push _, _, _ -> failwith "nothing to un-push"
       | Roll i as roll, _, _ -> 
           let s' = unroll_list s i in
           (roll::p, s', h_t)
       | Unroll i as unroll, _, _ ->
               let s' = roll_list s i in
               (unroll::p, s', h_t)
-      | ((Add | Mult | Div | Subt) as binop), Int result::s, n1::h_t ->
+      | ((Add | Mult | Div | Subt) as binop), Stack_Int result::s, n1::h_t ->
               let inv_f = match binop with
               | Add -> ( - )
               | Subt -> ( + )
               | Div -> ( * )
               | Mult -> ( / ) 
               | _ -> failwith "should not happen" in
-          (binop::p, Int n1::Int (inv_f result n1)::s, h_t)
+          (binop::p, Stack_Int (inv_f result n1)::Stack_Int n1::s, h_t)
       | (Add | Mult | Div | Subt), _, _ -> failwith "invalid un-binop"
       | Form_Closure(num_ops, num_vars) as fc, Closure(local_p, local_s)::s, _ ->
           (fc::local_p@p, local_s@s, h_t)

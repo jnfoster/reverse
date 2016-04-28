@@ -1,0 +1,3 @@
+let x = 8 / (4 - 2) in
+let y = 16 in
+y / x

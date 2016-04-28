@@ -1,6 +1,6 @@
 MAIN=rev
 
-OBJS = ast.cmo lexer.cmo parser.cmo machine.cmo pprint.cmo compiler.cmo eval.cmo main.cmo
+OBJS = common.cmo ast.cmo lexer.cmo parser.cmo machine.cmo pprint.cmo compiler.cmo eval.cmo main.cmo
 
 %.cmo : %.ml
 	ocamlc -c -g $<
