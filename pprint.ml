@@ -57,9 +57,11 @@ let print_val v =
   Format.printf "@]"
 
 (* Pretty print program *)
-let print_instrs (lst: program) =
+let rec print_instrs (lst: program) =
   let rec loop inst =
     match inst with
+    | Skip f -> 
+            let () = Format.printf "Skip" in f ()
     | Push i -> Format.printf "Push %d" i
     | Add -> Format.printf "Add"
     | Subt -> Format.printf "Subt"

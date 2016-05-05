@@ -1,5 +1,7 @@
 *.cmi
 *.cmo
+*.aux
+*.log
 lexer.ml
 parser.ml
 parser.mli

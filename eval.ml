@@ -41,6 +41,7 @@ let rec eval (g:env) (e:exp) : value =
 let rec eval_stack (state: machine_state) : machine_state =
     let (input_prog, stack, history_tape, history_prog) = state in
   match (stack : stack), input_prog with 
+  | _, Skip f::t_ops -> eval_stack (t_ops, stack, history_tape, Skip f::history_prog)
   | _, (Push i as push)::t_ops ->  
       let s' = (Stack_Int i)::stack in 
       eval_stack (t_ops, s', history_tape, push::history_prog)
@@ -86,6 +87,7 @@ let rec eval_stack (state: machine_state) : machine_state =
      * where the stack indexing starts at 1 *)
     let reverse (p, s, h_t) op  =
       match (op, s, h_t) with 
+      | Skip f, _, _ -> (Skip f::p, s, h_t) 
       | Push i as push, Stack_Int v::s, _ when i = v -> (push::p, s, h_t)
       | Push _, Stack_Int v::s, _ -> failwith "invalid un-push"
       | Push _, _, _ -> failwith "nothing to un-push"
