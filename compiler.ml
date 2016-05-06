@@ -58,7 +58,9 @@ let rec compile (e: exp) var_stack =
      * item in the stack. *)
     let update_roll instrs r u = 
         List.fold_left(fun acc x -> 
-            match x with Roll i -> acc @ [Roll (i + r); Unroll (u + 1)] 
+            match x with Roll i -> 
+                acc @ (if i + r = 1 then [] else [Roll (i + r)])
+                @ (if u + 1 = 1 then [] else [Unroll (u + 1)]) 
             | _ -> failwith "not expected") [] instrs in
     
     match e with
@@ -83,9 +85,13 @@ let rec compile (e: exp) var_stack =
 
             let roll_e2' = update_roll roll_e2 (List.length (grow_s_e1 @ grow_s_e2)) 
             (List.length grow_s_e2) in
+
+            let unroll_result =
+                let i = List.length (s' @ grow_s_e1) + 1 in
+                if i = 1 then [] else [Unroll i] in 
             
             (grow_e1 @ grow_e2, grow_s_e1 @ grow_s_e2, 
-            roll_e2' @ shrink_e2 @ [Unroll (List.length (s' @ grow_s_e1) + 1)] @ shrink_e1 @ [instr])
+            roll_e2' @ shrink_e2 @ unroll_result @ shrink_e1 @ [instr])
 
     | Let (x, e1, e2) ->
 
@@ -97,8 +103,12 @@ let rec compile (e: exp) var_stack =
             let roll_e1' = update_roll roll_e1 (List.length (grow_s_e2 @ grow_s_e1)) 
             (List.length grow_s_e1) in
 
+            let unroll_var = 
+                let i = List.length grow_s_e2 + 1 in
+                if i = 1 then [] else [Unroll i] in
+
             (grow_e2 @ grow_e1, grow_s_e2 @ grow_s_e1, 
-            roll_e1' @ shrink_e1 @ [Unroll (List.length grow_s_e2 + 1)] @ shrink_e2)
+            roll_e1' @ shrink_e1 @ unroll_var @ shrink_e2)
     
     | Lam (x, e) ->
 
@@ -106,7 +116,9 @@ let rec compile (e: exp) var_stack =
             let (grow_e, grow_s_e, shrink_e) = compile e ([Stack_Var x] @ fv_e) in
             let compile_e = grow_e @ shrink_e in
 
-            ([], [], roll_e @ [Form_Closure (List.length compile_e, List.length fv_e)] @ compile_e)
+            let roll_e' = update_roll roll_e 0 0 in
+
+            ([], [], roll_e' @ [Form_Closure (List.length compile_e, List.length fv_e)] @ compile_e)
 
     | App (e1, e2) ->
             let (s', fv_e1, _, roll_e1) = place_into_scope e1 var_stack [] in   
@@ -116,9 +128,13 @@ let rec compile (e: exp) var_stack =
 
             let roll_e1' = update_roll roll_e1 (List.length (grow_s_e2 @ grow_s_e1)) 
             (List.length grow_s_e1) in
+
+            let unroll_fun = 
+                let i = List.length (s' @ grow_s_e2) + 1 in
+                if i = 1 then [] else [Unroll i] in
             
             (grow_e2 @ grow_e1, grow_s_e2 @ grow_s_e1, 
-            roll_e1' @ shrink_e1 @ [Unroll (List.length (s' @ grow_s_e2) + 1)] @ shrink_e2 @ [Apply])
+            roll_e1' @ shrink_e1 @ unroll_fun @ shrink_e2 @ [Apply])
 
 
 (** Returns the list of stack machine instructions given an expression *)

@@ -86,6 +86,7 @@ let rec eval_stack (state: machine_state) : machine_state =
     (* Makes the top element of the stack the i-th element,
      * where the stack indexing starts at 1 *)
     let reverse (p, s, h_t) op  =
+            
       match (op, s, h_t) with 
       | Skip f, _, _ -> (Skip f::p, s, h_t) 
       | Push i as push, Stack_Int v::s, _ when i = v -> (push::p, s, h_t)
