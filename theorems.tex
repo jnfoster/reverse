@@ -19,9 +19,6 @@
 \usepackage{enumitem}
 \usepackage{amssymb}
 \usepackage{mathtools}
-\usepackage{array}
-\newcolumntype{P}[1]{>{\centering\arraybackslash}p{#1}}
-\usepackage{multirow,bigdelim}
 
 \begin{document}
 \title{Theorems to Prove}
@@ -44,6 +41,8 @@ Using the property of the well-formed closure, if we could prove the $\texttt{Un
     \texttt{Unique Splits}: \quad \forall \rho', \sigma'.\ \exists\ \vec{x}\ \texttt{splits}\ (\rho', \sigma', \vec{x}) \wedge \exists\ \vec{y}\ \texttt{splits}\ (\rho', \sigma', \vec{y}) \Longrightarrow \vec{x} = \vec{y}
 \end{align*}
 
+We introduce the following property and hypothesize that well-formed closures with the following property are uniquely reversible.
 
-
+$ \texttt{Igloo Property}$: We have program $\rho$ with initial stack $\sigma$ in a closure. Let $\hat{\rho_i}$ be the stack after executing $\hat{\rho_i}$, where $\hat{\rho_i}$ is the first $i$ instructions of $\rho$. A program has the Igloo property iff 
+$$\forall\ i.\ 0 < i < |\rho| \Rightarrow |\hat{\sigma_i}|.$$
 \end{document}
