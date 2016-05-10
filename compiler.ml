@@ -48,7 +48,22 @@ let place_into_scope e stack bound_vars =
         | Lam (v, e) ->
                 place e (stack, free_vars, ((Stack_Var v)::bound_vars), ops) in
         place e (stack, [], bound_vars, [])
-
+        
+let simplify_roll instrs =
+    let instrs' = 
+        List.filter (function | Roll 1 | Unroll 1 -> false | _ -> true) instrs in
+    let rec simple = function
+        | [] -> []
+        | (Roll m::Unroll n::t | Unroll m::Roll n::t) when m = n -> simple t
+        | Form_Closure(num_ops, num_vals) as fc::t -> 
+                begin
+                    match split_list t num_ops with
+                    | None -> failwith "not expected"
+                    | Some (clos, prog) -> fc::clos@(simple prog)
+                end
+        | h::t -> h::(simple t) in
+    let r = simple instrs' in
+    if r = [] then [Roll 1] else r
 
 let rec compile (e: exp) var_stack = 
    
@@ -57,10 +72,8 @@ let rec compile (e: exp) var_stack =
      * Unroll (u + 1) instruction then lowers this
      * item in the stack. *)
     let update_roll instrs r u = 
-        List.fold_left(fun acc x -> 
-            match x with Roll i -> 
-                acc @ (if i + r = 1 then [] else [Roll (i + r)])
-                @ (if u + 1 = 1 then [] else [Unroll (u + 1)]) 
+        List.fold_left (fun acc x -> 
+            match x with Roll i -> acc @ [Roll (i + r); Unroll (u + 1)]
             | _ -> failwith "not expected") [] instrs in
     
     match e with
@@ -86,9 +99,7 @@ let rec compile (e: exp) var_stack =
             let roll_e2' = update_roll roll_e2 (List.length (grow_s_e1 @ grow_s_e2)) 
             (List.length grow_s_e2) in
 
-            let unroll_result =
-                let i = List.length (s' @ grow_s_e1) + 1 in
-                if i = 1 then [] else [Unroll i] in 
+            let unroll_result = [Unroll (List.length (s' @ grow_s_e1) + 1)]in
             
             (grow_e1 @ grow_e2, grow_s_e1 @ grow_s_e2, 
             roll_e2' @ shrink_e2 @ unroll_result @ shrink_e1 @ [instr])
@@ -103,9 +114,7 @@ let rec compile (e: exp) var_stack =
             let roll_e1' = update_roll roll_e1 (List.length (grow_s_e2 @ grow_s_e1)) 
             (List.length grow_s_e1) in
 
-            let unroll_var = 
-                let i = List.length grow_s_e2 + 1 in
-                if i = 1 then [] else [Unroll i] in
+            let unroll_var = [Unroll (List.length grow_s_e2 + 1)] in
 
             (grow_e2 @ grow_e1, grow_s_e2 @ grow_s_e1, 
             roll_e1' @ shrink_e1 @ unroll_var @ shrink_e2)
@@ -113,12 +122,13 @@ let rec compile (e: exp) var_stack =
     | Lam (x, e) ->
 
             let (s', fv_e, _, roll_e) = place_into_scope e var_stack [Stack_Var x] in
-            let (grow_e, grow_s_e, shrink_e) = compile e ([Stack_Var x] @ fv_e) in
-            let compile_e = grow_e @ shrink_e in
+            let (grow_e, _, shrink_e) = compile e ([Stack_Var x] @ fv_e) in
 
             let roll_e' = update_roll roll_e 0 0 in
 
-            ([], [], roll_e' @ [Form_Closure (List.length compile_e, List.length fv_e)] @ compile_e)
+            let simple_e = simplify_roll (grow_e @ shrink_e) in 
+
+            ([], [], roll_e' @ [Form_Closure (List.length simple_e, List.length fv_e)] @ simple_e)
 
     | App (e1, e2) ->
             let (s', fv_e1, _, roll_e1) = place_into_scope e1 var_stack [] in   
@@ -129,9 +139,7 @@ let rec compile (e: exp) var_stack =
             let roll_e1' = update_roll roll_e1 (List.length (grow_s_e2 @ grow_s_e1)) 
             (List.length grow_s_e1) in
 
-            let unroll_fun = 
-                let i = List.length (s' @ grow_s_e2) + 1 in
-                if i = 1 then [] else [Unroll i] in
+            let unroll_fun = [Unroll (List.length (s' @ grow_s_e2) + 1)] in
             
             (grow_e2 @ grow_e1, grow_s_e2 @ grow_s_e1, 
             roll_e1' @ shrink_e1 @ unroll_fun @ shrink_e2 @ [Apply])
@@ -140,4 +148,4 @@ let rec compile (e: exp) var_stack =
 (** Returns the list of stack machine instructions given an expression *)
 let translate (init_repr:stack_repr) (e: exp) : program = 
     let (grow_ops, _, shrink_ops) = compile e init_repr in
-    grow_ops @ shrink_ops
+    simplify_roll @@ grow_ops @ shrink_ops
