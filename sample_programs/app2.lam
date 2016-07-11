@@ -1,2 +1,2 @@
 let a = 10 in
-(lambda x. let y = x + a in y)
+(lambda x. x + a) 5

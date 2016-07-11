@@ -16,9 +16,9 @@ let () =
       if pos > 2 then 
         let parsed = 
           try int_of_string x
-          with Failure "int_of_string" -> 
-            Format.printf "Argument to function must be an integer\n";
-            exit 0 in
+          with
+          Failure "int_of_string" -> 
+              Format.printf "Argument to function must be an integer\n"; exit 0 in
         (Stack_Int parsed)::stack
       else stack) [] args in
 
@@ -56,8 +56,18 @@ let () =
       let repr' = Stack_Var var::repr in
       (e', repr', input_num + 1)) init_stack (parsed_exp, [], 1) in
 
+  let lifted_e = Lifting.lift e in
+  let () = assert (Lifting.is_target_prog lifted_e) in
+
+  (* (4) Pretty print the expression *)
+  let _ =
+    Format.printf "@[";
+    Format.printf "Lambda Lifted Expression:@\n  @[";
+    Pprint.print_exp lifted_e;
+    Format.printf "@]@\n@\n" in
+
   (* (6) Translate the expression  to machine instructions *)
-  let program = Compiler.translate init_stack_repr e in
+  let program = Compiler.translate init_stack_repr lifted_e in
   let _ =
     Format.printf "Translated expression into machine instructions...@\n";
     Format.print_flush ();

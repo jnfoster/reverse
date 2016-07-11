@@ -1,0 +1,3 @@
+let a = 4 in
+let f = (lambda y. a + y) in
+f 2

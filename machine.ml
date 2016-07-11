@@ -1,11 +1,11 @@
 open Ast
 
 (** Stack machine instructions *)
-type operation = Push of int | Add | Subt | Mult | Div | Roll of int | Apply | Unroll of int | Form_Closure of int * int | Skip of (unit -> unit)
+type operation = Push of int | Add | Subt | Mult | Div | Roll of int | MultiApply of int | Unroll of int | Form_Closure of int * int | Skip of (unit -> unit)
 type program = operation list
 
 (** Stack machine values *)
-type stack_value = Stack_Int of int | Closure of program * stack
+type stack_value = Stack_Int of int | Closure of int * program
 and stack = stack_value list
 
 (** Used to maintain a representation of the stack *)

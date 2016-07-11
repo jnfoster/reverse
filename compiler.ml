@@ -1,151 +1,162 @@
-open Common
+open Util
 open Ast
 open Machine
 open Pprint
 
-(** Helper function to to_stack which prepares the stack for a
-    Form_Closure instruction by moving free variables referenced
-    in the body of the function to the bottom of the stack.
-    Explained in further detail in documentation.pdf *)
-
-let place_into_scope e stack bound_vars = 
- 
-    let rec place e (stack, free_vars, bound_vars, ops)  =
-        let orig_args = (stack, free_vars, bound_vars, ops) in
-        (** Finds the location of the variable in the stack,
-         * returns the stack with the variable removed and the
-         * former location of the varible if it is found,
-         * where locations are 1-indexed *)
-         
-         let find_var_loc var s =
-             let indexed = List.mapi (fun i x -> (i + 1,x)) s in
-             List.fold_left (fun (ind, new_st) (i,x) ->
-                 match ind, x with
-                 | None, Stack_Var w when w = var -> (Some i, new_st)
-                 | _ -> (ind, new_st@[x])) (None, []) indexed in
-         let is_in_stack var s =
-             List.exists (function
-                 | Stack_Var x -> x = var
-                 | Const -> false) s in
-         
-         match e with
-         | Var v -> 
-                 if is_in_stack v free_vars || is_in_stack v bound_vars
-                 then orig_args else
-                     let (loc, new_st) = find_var_loc v stack in
-                     begin
-                         match loc with
-                         | None -> raise (UnboundVariable v)
-                         | Some loc -> (new_st, (Stack_Var v)::free_vars, bound_vars,
-                         ops @ [Roll loc])
-                     end
-        | Int _ -> orig_args
-        | App (e1, e2) | Binop (_, e1, e2) ->
-                place e2 @@ place e1 @@ orig_args
-        | Let (v, e1, e2) ->
-                let (s, fv, bv, ops) = place e1 orig_args in
-                place e2 (s, fv, ((Stack_Var v)::bv), ops)
-        | Lam (v, e) ->
-                place e (stack, free_vars, ((Stack_Var v)::bound_vars), ops) in
-        place e (stack, [], bound_vars, [])
-        
-let simplify_roll instrs =
-    let instrs' = 
-        List.filter (function | Roll 1 | Unroll 1 -> false | _ -> true) instrs in
-    let rec simple = function
+    let rec simplify_roll p =
+        let rec simple p = match p with
         | [] -> []
-        | (Roll m::Unroll n::t | Unroll m::Roll n::t) when m = n -> simple t
-        | Form_Closure(num_ops, num_vals) as fc::t -> 
-                begin
+        | Unroll i1::Roll i2::t
+        | Roll i1 :: Unroll i2::t  when i1 = i2 -> simple t
+        | Unroll 1::t | Roll 1::t -> simple t
+        | Form_Closure (_, num_ops) as fc::t-> 
+                begin 
                     match split_list t num_ops with
                     | None -> failwith "not expected"
-                    | Some (clos, prog) -> fc::clos@(simple prog)
+                    | Some (cl, t_ops) -> fc::cl @ (simple t_ops)
                 end
-        | h::t -> h::(simple t) in
-    let r = simple instrs' in
-    if r = [] then [Roll 1] else r
+        | x::t -> x::(simple t) in
+        match simple p with
+        | [] -> [Roll 1]
+        | l when List.length l < List.length p -> simplify_roll l
+        | l -> l
+    
+let rec compile (e: exp) var_stack =
 
-let rec compile (e: exp) var_stack = 
-   
-    (* Update [Roll i] to [Roll i + r] instruction,
-     * which should bring desired item to top of stack.
-     * Unroll (u + 1) instruction then lowers this
-     * item in the stack. *)
     let update_roll instrs r u = 
-        List.fold_left (fun acc x -> 
+        List.fold_left (fun acc x ->
             match x with Roll i -> acc @ [Roll (i + r); Unroll (u + 1)]
             | _ -> failwith "not expected") [] instrs in
-    
+
+    let place_into_scope e s = 
+        let find_var_loc var s = 
+            let indexed = List.mapi (fun i x -> (i + 1, x)) s in
+            List.fold_left (fun (ind, new_st) (i, x) ->
+                match ind, x with
+                | None, Stack_Var w when w = var -> (Some i, new_st)
+                | _ -> (ind, new_st @ [x])) (None, []) indexed in
+
+        (* todo get the free variables then get them onto the stack *)
+        let free = HashSet.values (Ast.fv e) in
+        List.fold_left (fun (st, fvs, roll_ops) x ->
+            match find_var_loc x st with
+            | None, _ -> failwith "not expected"
+            | Some ind, st' -> 
+                    (st', (Stack_Var x)::fvs, roll_ops @ [Roll ind])) 
+        (s, [], []) free in
+
     match e with
     | Int i -> 
-            let () = assert (var_stack = []) in
-            ([Push i], [Const], [])
-    | Var v ->
-            let () = assert (var_stack = [Stack_Var v]) in
-            ([], [], [])
-    | Binop (op, e1, e2) ->
 
+            let () = assert (var_stack = []) in
+            ([Push i], 1, [])
+
+    | Var v ->
+
+            let () = assert (var_stack = [Stack_Var v]) in
+            ([], 0, [])
+
+    | Binop (op, e1, e2) ->
+            
             let instr = match op with
                 | Plus -> Add
                 | Minus -> Subt
                 | Divide -> Div
                 | Multiply -> Mult in
 
-            let (s', fv_e2, _, roll_e2) = place_into_scope e2 var_stack [] in   
+            let (st', fv_e2, roll_e2) = place_into_scope e2 var_stack in
             let (grow_e2, grow_s_e2, shrink_e2) = compile e2 fv_e2 in
-            
-            let (grow_e1, grow_s_e1, shrink_e1) = compile e1 s' in
 
-            let roll_e2' = update_roll roll_e2 (List.length (grow_s_e1 @ grow_s_e2)) 
-            (List.length grow_s_e2) in
+            let () = assert (HashSet.size (Ast.fv e1) =
+            List.length var_stack - List.length fv_e2) in
 
-            let unroll_result = [Unroll (List.length (s' @ grow_s_e1) + 1)]in
-            
-            (grow_e1 @ grow_e2, grow_s_e1 @ grow_s_e2, 
+            let (grow_e1, grow_s_e1, shrink_e1) = compile e1 st' in
+
+            let roll_e2' = update_roll roll_e2 (grow_s_e1 + grow_s_e2) grow_s_e2 in
+
+            (* Place the result of evaluating e2 at bottom of stack *)
+            let unroll_result = [Unroll (List.length st' + grow_s_e1 + 1)] in
+
+            (* e1 -> v1 and e2 -> v2, and v1 should be at the top of the
+             * stack with v2 below (only elements on stack) *)
+            (grow_e1 @ grow_e2, grow_s_e1 + grow_s_e2,
             roll_e2' @ shrink_e2 @ unroll_result @ shrink_e1 @ [instr])
 
     | Let (x, e1, e2) ->
-
-            let (s', fv_e1, _, roll_e1) = place_into_scope e1 var_stack [] in
+            
+            let (st', fv_e1, roll_e1) = place_into_scope e1 var_stack in
             let (grow_e1, grow_s_e1, shrink_e1) = compile e1 fv_e1 in
 
-            let (grow_e2, grow_s_e2, shrink_e2) = compile e2 ([Stack_Var x] @ s') in
-            
-            let roll_e1' = update_roll roll_e1 (List.length (grow_s_e2 @ grow_s_e1)) 
-            (List.length grow_s_e1) in
+            let () = assert (HashSet.mem (Ast.fv e2) x) in
 
-            let unroll_var = [Unroll (List.length grow_s_e2 + 1)] in
+            let () = assert (HashSet.size (Ast.fv e2) - 1 =
+            List.length var_stack - List.length fv_e1) in
 
-            (grow_e2 @ grow_e1, grow_s_e2 @ grow_s_e1, 
+            let (grow_e2, grow_s_e2, shrink_e2) = compile e2 ((Stack_Var x)::st') in
+
+            let roll_e1' = update_roll roll_e1 (grow_s_e2 + grow_s_e1) grow_s_e1 in
+
+            (* e1 -> x is placed top of the fvs used in e2 *)
+            let unroll_var = [Unroll (grow_s_e2 + 1)] in
+
+            (grow_e2 @ grow_e1, grow_s_e2 + grow_s_e1,
             roll_e1' @ shrink_e1 @ unroll_var @ shrink_e2)
     
-    | Lam (x, e) ->
+    | Lam (l, e) ->
 
-            let (s', fv_e, _, roll_e) = place_into_scope e var_stack [Stack_Var x] in
-            let (grow_e, _, shrink_e) = compile e ([Stack_Var x] @ fv_e) in
-
-            let roll_e' = update_roll roll_e 0 0 in
+            let l' = List.map (fun x -> Stack_Var x) l in
+            
+            let (grow_e, _, shrink_e) = compile e l' in
 
             let simple_e = simplify_roll (grow_e @ shrink_e) in 
-
-            ([], [], roll_e' @ [Form_Closure (List.length simple_e, List.length fv_e)] @ simple_e)
+            
+            ([Form_Closure (List.length l, List.length simple_e)] @ simple_e, 1, [])
 
     | App (e1, e2) ->
-            let (s', fv_e1, _, roll_e1) = place_into_scope e1 var_stack [] in   
-            let (grow_e1, grow_s_e1, shrink_e1) = compile e1 fv_e1 in
+
+            let (f, args) = 
+                let rec fold_app (f, acc) e = match e with
+                | App (e1, e2) -> 
+                        fold_app (e1, e2::acc) e1
+                | _ -> (f, acc) in
+                fold_app (e1, [e2]) e1 in
+
+            let (st', ops) = 
+                List.fold_left (fun (st, ops) e ->
+                    let (st', fv_e, roll_e) = place_into_scope e st in
+                    (st', ops @ [(compile e fv_e, roll_e)])) (var_stack, []) (f::args) in
+
+            (* should consume all vars on stack *)
+            let () = assert (List.length st' = 0) in
+
+            let total_growth = 
+                List.fold_left (fun sum ((_, g, _), _) -> sum + g) 0 ops in
+            let total_vars =
+                List.length var_stack in
+
+            let (grow_ops, shrink_ops, g, n_fvs, n_vals) =
+
+                let combine_ops (grow_ops, shrink_ops, growth, num_fvs, num_vals) 
+                ((grow_e, grow_s_e, shrink_e), roll_e) = 
+
+                    let roll_e' = update_roll roll_e growth grow_s_e in
+                    let growth' = growth - grow_s_e in
+                    let num_fvs' = num_fvs - (List.length roll_e) in
+                    let unroll_v = [Unroll (growth' + num_fvs' + num_vals + 1)] in
+
+                    (grow_e @ grow_ops, shrink_ops @ roll_e' @ shrink_e @ unroll_v, 
+                    growth', num_fvs', num_vals + 1) in
+                
+                List.fold_left combine_ops ([], [], total_growth, total_vars, 0) ops in
             
-            let (grow_e2, grow_s_e2, shrink_e2) = compile e2 s' in
-
-            let roll_e1' = update_roll roll_e1 (List.length (grow_s_e2 @ grow_s_e1)) 
-            (List.length grow_s_e1) in
-
-            let unroll_fun = [Unroll (List.length (s' @ grow_s_e2) + 1)] in
-            
-            (grow_e2 @ grow_e1, grow_s_e2 @ grow_s_e1, 
-            roll_e1' @ shrink_e1 @ unroll_fun @ shrink_e2 @ [Apply])
-
+            let () = assert (g = 0) in 
+            let () = assert (n_fvs = 0) in
+            let () = assert (n_vals = List.length args + 1) in
+            (grow_ops, total_growth, shrink_ops @ [MultiApply (List.length args)])
+                    
 
 (** Returns the list of stack machine instructions given an expression *)
 let translate (init_repr:stack_repr) (e: exp) : program = 
+    let () = assert (Lifting.is_target_prog e) in
     let (grow_ops, _, shrink_ops) = compile e init_repr in
-    simplify_roll @@ grow_ops @ shrink_ops
+    simplify_roll (grow_ops @ shrink_ops)

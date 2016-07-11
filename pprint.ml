@@ -1,4 +1,5 @@
 open Ast
+open State
 open Machine
 
 (* Pretty printing helper functions *)
@@ -15,10 +16,12 @@ let print_binop p s x y =
   p y;
   Format.printf ")@]"
 
-let print_lambda p x e =
-  Format.printf "@[<2>(lambda %s.@ " x;
-  p e;
-  Format.printf ")@]"
+let print_lambda p xs e =
+    Format.printf "@[<2>(lambda";
+    List.iter (fun x -> Format.printf " "; print_ident x) xs;
+    Format.printf ".@ ";
+    p e;
+    Format.printf ")@]"
 
 let print_let p x e1 e2 =
   Format.printf "@[<2>let %s =@ " x;
@@ -56,12 +59,19 @@ let print_val v =
   loop v;
   Format.printf "@]"
 
+let print_state s = 
+    let print_binding (var, value) =
+        Format.printf "(%s, " var;
+        print_val value;
+        Format.printf ")" in
+    List.iter print_binding (State.bindings s)
+
 (* Pretty print program *)
 let rec print_instrs (lst: program) =
   let rec loop inst =
     match inst with
     | Skip f -> 
-            let () = Format.printf "Skip" in f ()
+            let () = Format.printf "Skip---\n" in f ()
     | Push i -> Format.printf "Push %d" i
     | Add -> Format.printf "Add"
     | Subt -> Format.printf "Subt"
@@ -69,7 +79,7 @@ let rec print_instrs (lst: program) =
     | Div -> Format.printf "Div"
     | Roll i -> Format.printf "Roll %d" i
     | Unroll i -> Format.printf "Unroll %d" i
-    | Apply -> Format.printf "Apply"
+    | MultiApply i -> Format.printf "MultiApply %d" i
     | Form_Closure (num_ops, num_vals) ->
        Format.printf "Form_Closure (%d, %d)" num_ops num_vals in
   List.iter (fun x -> loop x; Format.printf "\n") lst

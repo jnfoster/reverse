@@ -1,30 +1,28 @@
-open Common
+open Util
 open Ast
+open State
 open Machine
 exception IllformedExpression
 
-let rec eval (g:env) (e:exp) : value =
+let rec eval (e:exp) (s: state) : value =
   match e with
-    | Var x -> g x
+    | Var x -> lookup s x
     | App(e1,e2) ->
       begin
-        match eval g e1 with
-          | VClosure(g',x,body) ->
-            let v2 = eval g e2 in
-            let g2 = extend g' x v2 in
-            eval g2 body
-          | _ ->
-            raise IllformedExpression
+        match eval e1 s with
+          | VClosure (Lam (x::t, e), c) ->
+                  let v = eval e2 s in
+                  eval (Lam (t, e)) (update c x v)
+          | _ -> raise IllformedExpression
       end
-    | Lam(x,body) ->
-      VClosure(g,x,body)
+    | Lam([], e) -> eval e s
+    | Lam _ -> VClosure (e, s)
     | Let(x,e1,e2) ->
-      eval g (App(Lam(x,e2), e1))
-    | Int n ->
-      VInt n
+            eval (App(Lam([x],e2), e1)) s
+    | Int n -> VInt n
     | Binop (op, e1,e2) ->
       begin
-        match eval g e1, eval g e2 with
+        match eval e1 s, eval e2 s with
           | VInt n1, VInt n2 ->
                   begin match op with 
                   | Plus -> VInt(n1 + n2)
@@ -54,29 +52,29 @@ let rec eval_stack (state: machine_state) : machine_state =
           | _ -> failwith "should not happen" in
       let s' = Stack_Int (f i1 i2)::t_stack in
       eval_stack (t_ops, s', i2::history_tape, op::history_prog)
-  | _, (Add|Mult|Div|Subt)::t_ops -> failwith "invalid binop"
+  | _, (Add|Mult|Div|Subt)::t_ops -> 
+          failwith "invalid binop"
   | _, (Roll i as roll)::t_ops ->
       let s' = roll_list stack i in
       eval_stack (t_ops, s', history_tape, roll:: history_prog)
   | _, (Unroll i as unroll)::t_ops ->
       let s' = unroll_list stack i in
       eval_stack (t_ops, s', history_tape, unroll:: history_prog)
-  | _, (Form_Closure (num_ops, num_vars) as fc)::t_ops ->
+  | _, (Form_Closure (num_vals, num_ops) as fc)::t_ops ->
       begin 
-        match split_list t_ops num_ops, split_list stack num_vars with
-        | Some (local_ops, t_ops), Some (local_stack, t_stack) ->
-            let s' = Closure (local_ops, local_stack)::t_stack in
-            eval_stack (t_ops, s', history_tape, 
-            fc::history_prog)
+        match split_list t_ops num_ops with
+        | Some (local_ops, t_ops) ->
+            let s' = Closure (num_vals, local_ops)::stack in
+            eval_stack (t_ops, s', history_tape, fc::history_prog)
         | _ -> failwith "invalid form closure"
       end
-  | argument::(Closure (local_prog, local_stack))::t_stack, Apply::t_ops ->
-      let s' = argument::local_stack@t_stack in
-      let ops' = local_prog@t_ops in
-      eval_stack (ops', s', 
-      (List.length local_prog)::(List.length local_stack)::history_tape, 
-      Apply::history_prog)
-  | _, Apply::_ -> failwith "invalid apply"
+  | (Closure (n1, local_ops))::t_stack, (MultiApply n2 as ma)::t_ops when n1 = n2 ->
+      let ops' = local_ops @ t_ops in
+      eval_stack (ops', t_stack, 
+      (List.length local_ops)::history_tape, ma::history_prog)
+  | _, MultiApply _::_ -> 
+          let () = Pprint.print_stack stack in
+          failwith "invalid apply"
   | _::[], [] -> state 
   | _, [] -> failwith "unused variable on stack"
 
@@ -107,21 +105,25 @@ let rec eval_stack (state: machine_state) : machine_state =
               | _ -> failwith "should not happen" in
           (binop::p, Stack_Int (inv_f result n1)::Stack_Int n1::s, h_t)
       | (Add | Mult | Div | Subt), _, _ -> failwith "invalid un-binop"
-      | Form_Closure(num_ops, num_vars) as fc, Closure(local_p, local_s)::s, _ ->
-          (fc::local_p@p, local_s@s, h_t)
+      | Form_Closure(n1, num_ops) as fc, Closure(n2, local_ops)::s, _ when n1 = n2 ->
+          (fc::local_ops @ p, s, h_t)
       | Form_Closure _, _, _ ->
           failwith "invalid un-form_closure"
-      | Apply, arg::s, num_ops::num_vars::h_t ->
+      | MultiApply n1 as ma, _, num_ops::h_t  when List.length p >= num_ops && List.length s >= n1->
           begin 
-            match split_list p num_ops, split_list s num_vars with
-            | Some (local_p, p), Some (local_s, s) -> 
-                let cl = Closure(local_p, local_s) in
-                let s' = arg::cl::s in
-                (Apply::p, s', h_t) 
+            match split_list p num_ops with
+            | Some (local_p, p) -> 
+                let cl = Closure(n1, local_p) in
+                let s' = cl::s in
+                (ma::p, s', h_t) 
             | _ -> failwith "invalid un-apply"
       end
-      | Apply, _, _ -> failwith "invalid un-apply" in
-    let (restored_prog, restored_stack, restored_history) = 
+      | MultiApply _, _, _ -> 
+              let () = Format.printf "hello!-----\n" in
+              let () = Pprint.print_instrs p in
+              let () = Pprint.print_stack stack in
+              failwith "invalid un-apply" in
+              let (restored_prog, restored_stack, restored_history) = 
       List.fold_left reverse (program, stack, history_tape) history_prog in
     (restored_prog, restored_stack, restored_history, [])
 
