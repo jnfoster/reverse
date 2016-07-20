@@ -73,7 +73,6 @@ let rec eval_stack (state: machine_state) : machine_state =
       eval_stack (ops', t_stack, 
       (List.length local_ops)::history_tape, ma::history_prog)
   | _, MultiApply _::_ -> 
-          let () = Pprint.print_stack stack in
           failwith "invalid apply"
   | _::[], [] -> state 
   | _, [] -> failwith "unused variable on stack"
@@ -109,21 +108,30 @@ let rec eval_stack (state: machine_state) : machine_state =
           (fc::local_ops @ p, s, h_t)
       | Form_Closure _, _, _ ->
           failwith "invalid un-form_closure"
-      | MultiApply n1 as ma, _, num_ops::h_t  when List.length p >= num_ops && List.length s >= n1->
-          begin 
-            match split_list p num_ops with
-            | Some (local_p, p) -> 
-                let cl = Closure(n1, local_p) in
-                let s' = cl::s in
-                (ma::p, s', h_t) 
-            | _ -> failwith "invalid un-apply"
-      end
+      | MultiApply n as ma, _, num_ops::h_t  when List.length p >= num_ops && List.length s >= n->
+              let rec restore n (acc, p) = 
+                  if n = 1 && List.length acc > 0 then (acc, p)
+                  else 
+                      match p with
+                      | (Add | Mult | Div | Subt) as b::t_ops -> 
+                          restore (n - 1) (acc @ [b], t_ops)
+                      | MultiApply m as ma::t_ops -> 
+                          restore (n - m) (acc @ [ma], t_ops)
+                      | (Unroll i | Roll i) as r::t_ops ->
+                              let () = assert (n >= i) in 
+                              restore n (acc @ [r], t_ops)
+                      | Push _ as p::t_ops -> 
+                              restore (n + 1) (acc @ [p], t_ops)
+                      | Skip _ as s::t_ops -> restore n (acc @ [s], t_ops)
+                      | (Form_Closure _::_ | []) -> failwith "not expected" in
+              let (local_p, t_p) = restore n ([], p) in
+              let cl = Closure (n, local_p) in
+              let s' = cl::s in
+              let () = assert (List.length local_p = num_ops) in
+              (ma::t_p, s', h_t)
       | MultiApply _, _, _ -> 
-              let () = Format.printf "hello!-----\n" in
-              let () = Pprint.print_instrs p in
-              let () = Pprint.print_stack stack in
               failwith "invalid un-apply" in
-              let (restored_prog, restored_stack, restored_history) = 
-      List.fold_left reverse (program, stack, history_tape) history_prog in
+    let (restored_prog, restored_stack, restored_history) = 
+        List.fold_left reverse (program, stack, history_tape) history_prog in
     (restored_prog, restored_stack, restored_history, [])
 

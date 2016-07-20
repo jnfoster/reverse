@@ -1,1 +1,1 @@
-(lambda x. (lambda y. (lambda z. (x + y) / z))) 3 5 2
+let f = (lambda x. (lambda y. (lambda z. (x + y) / z))) in (f 3 5 2) / 4

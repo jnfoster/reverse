@@ -4,11 +4,25 @@ open Machine
 open Pprint
 
     let rec simplify_roll p =
-        let rec simple p = match p with
+        let remove_cycles p i = 
+            match split_list p i with
+            | Some ((Unroll _ | Roll _) as op::_ as l1, l2) -> 
+                    let is_cycle = 
+                        List.fold_left (fun acc x -> (x = op) && acc) true l1 in
+                    if is_cycle then Some l2 else None
+            | _ -> None in 
+
+        let rec simple = function
         | [] -> []
         | Unroll i1::Roll i2::t
         | Roll i1 :: Unroll i2::t  when i1 = i2 -> simple t
         | Unroll 1::t | Roll 1::t -> simple t
+        | ((Roll i | Unroll i) as r::t) as p -> 
+                begin
+                    match remove_cycles p i with
+                    | None -> r::(simple t)
+                    | Some l -> simple l
+                end
         | Form_Closure (_, num_ops) as fc::t-> 
                 begin 
                     match split_list t num_ops with
