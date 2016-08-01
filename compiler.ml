@@ -3,6 +3,7 @@ open Ast
 open Machine
 open Pprint
 
+    (** Removes redundant roll and unroll operations *)
     let rec simplify_roll p =
         let remove_cycles p i = 
             match split_list p i with
@@ -35,6 +36,8 @@ open Pprint
         | l when List.length l < List.length p -> simplify_roll l
         | l -> l
     
+(** Given e and var_stack, where |fv(e)| = |var_stack|,
+ * produces a program that satisfies the Grow_Shrink property *)
 let rec compile (e: exp) var_stack =
 
     let update_roll instrs r u = 

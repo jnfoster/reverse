@@ -1,6 +1,6 @@
 MAIN=rev
 
-OBJS = util.cmo ast.cmo state.cmo lexer.cmo parser.cmo machine.cmo pprint.cmo eval.cmo lifting.cmo compiler.cmo main.cmo
+OBJS = util.cmo ast.cmo state.cmo lifting.cmo lexer.cmo parser.cmo machine.cmo pprint.cmo eval.cmo compiler.cmo main.cmo
 
 %.cmo : %.ml
 	ocamlc -c -g $<

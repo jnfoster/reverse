@@ -4,6 +4,8 @@ open State
 open Machine
 exception IllformedExpression
 
+(** Evaluates an expression in the source language
+ * without translating to machine instructions. *)
 let rec eval (e:exp) (s: state) : value =
   match e with
     | Var x -> lookup s x
@@ -79,9 +81,9 @@ let rec eval_stack (state: machine_state) : machine_state =
 
 
 
+(** Reverses evaluation.
+    Reversability of each instruction explained in documentation.pdf *)
   let reverse_history (program, stack, history_tape, history_prog) = 
-    (* Makes the top element of the stack the i-th element,
-     * where the stack indexing starts at 1 *)
     let reverse (p, s, h_t) op  =
             
       match (op, s, h_t) with 

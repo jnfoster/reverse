@@ -1,6 +1,5 @@
 open Util
 open Ast
-open Eval 
 open State
 
 let rec is_target_exp (e : exp) : bool =
