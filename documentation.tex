@@ -20,6 +20,7 @@
 \usepackage{amssymb}
 \usepackage{mathtools}
 \usepackage{array}
+\usepackage{verbatim}
 \newcolumntype{P}[1]{>{\centering\arraybackslash}p{#1}}
 \usepackage{multirow,bigdelim}
 
@@ -33,48 +34,49 @@
 
 \section*{Overview:}
 
-Given a linear lambda calculus expression, the compiler translates the expression to stack machine instructions. Once the set of instructions have been produced, the expression can be evaluated to a value $\texttt{<val>}$, which can either be an integer $\texttt{<i>}$ or a function closure $\texttt{<closure>}$. 
+Given a linear lambda calculus expression, the compiler translates the expression to a lambda-lifted expression and then to stack machine instructions. Once the set of instructions have been produced, the expression can be evaluated to a value $v$, which can either be an integer or a function closure.
 
 \medskip
-The following grammar defines an expression $\texttt{exp}$, where $\texttt{<var>}$ is a string that represents a value.
+The following grammar defines an expression $e$, where $x$ is a variable and $n$ is an integer.
 
-\vspace{5mm}
+\begin{align*}
+    b\ &::=\ +\ |\ -\ |\ /\ |\ *\\
+    e\ &::=\ n\ |\ x\ |\ e_1\ b\ e_2\ |\ \text{let}\ x\ =\ e_1\ \text{in}\ e_2\\
+    &|\ \lambda\ x.\ e\ |\ e_1\ e_2
+\end{align*}
 
-$\texttt{exp ::= <i>}$
+The compiler assumes that expressions are well-typed. In expressions of the form $e_1\ b\ e_2$, both $e_1$ and $e_2$ must evaluate to integers. Expressions of the form $e_1\ e_2$ are assumed to be valid function applications. Since the language is linear, each variable is assumed to be used exactly once.
 
-\hspace{12 mm} $\texttt {| <var>}$ 
+\section*{Lambda Lifting Expressions:}
 
-\hspace{12 mm} $\texttt {| <exp> + <exp>}$ 
+The following grammar defines a lambda-lifted program $p$.
 
-\hspace{12 mm} $\texttt{| let <var> = <exp> in <exp>}$
+\begin{align*}
+    p\ &::=\ \text{let}\ x\ =\ \lambda\ x_1, \ldots, x_n.\ e\ \text{in}\ p\ |\ e\\
+    b\ &::=\ +\ |\ -\ |\ /\ |\ *\\
+    e\ &::=\ n\ |\ x\ |\ e_1\ b\ e_2\ |\ e_1\ e_2
+\end{align*}
 
-\hspace{12 mm} $\texttt {| } \lambda \texttt{<var>. <exp>}$ 
-
-\hspace{12 mm} $\texttt{| <exp> <exp>}$
-
-\vspace{5mm}
-
-The compiler assumes that expressions are well-typed. In expressions of the form $\texttt {<exp> + <exp>}$, the expressions added must evaluate to integers. Expressions of the form $\texttt{<exp> <exp>}$ are assumed to be valid function applications. Since the language is linear, each variable is assumed to be used exactly once.
+The expressions $e$ are $\lambda$-free, meaning they do not contain $\lambda$-abstractions or $\text{let}$-expressions. The important property that lambda lifting gives is that $\lambda$-expressions are closed. Therefore, the closures they produce have empty environments.
 
 \section*{Stack Machine Instruction Set:}
 
 An instruction can be any of the following:
 
-\medskip
+\begin{align*}
+    i\ &::=\ \text {Push}\ n\ |\ \text {Add}\ |\ \text {Subt}\ |\ \text {Mult}\ |\ \text {Div}\\
+    & |\ \text{Roll}\ n\ |\ \text {Unroll}\ n\ |\ \text{Form\_Closure}\ (n_v, n_{\rho})\ |\ \text{MultiApply}\ n
+\end{align*}
 
-$\texttt{instr ::= Push <i> | Add | Roll <i> | Form\_Closure (<i>, <i>) | Apply}$
+Here we define machine program $p$, stack $s$, and stack value $s\_v$:
 
-\medskip
+\begin{align*}
+    \rho\ &::=\ i\ \text{list}\\
+    v\ &::=\ \text {Int}\ n\ |\ \text {Closure}\ (n, \rho) \\
+    \sigma &::=\ v\ \text{list}\\
+\end{align*}
 
-The execution of each instruction modifies the stack, a list of $\texttt{stack\_value}$, defined as such:
-
-\medskip
-
-$\texttt{stack\_value ::= Int <i> | Closure(<instr list>, <stack\_value list>)}$
-
-\medskip
-
-In this documentation and the code, it is also useful to define $\texttt{program ::= instr list}$ and $\texttt{stack ::= stack\_value list}$. 
+\iffalse{Now we pictorally describe what each instruction achieves. 
 
 
 \begin{center}
@@ -94,20 +96,20 @@ In this documentation and the code, it is also useful to define $\texttt{program
 $\texttt{  Push <i>}$ simply pushes an integer to the bottom of the stack.
 
 \begin{center}
-  \begin{tabular}{|P{2.5cm}|P{2.5cm}|P{2.5cm}|}
+    \begin{tabular}{|P{2.5cm}|P{6cm}|P{2.5cm}|}
     \cline{0-0} \cline{3-3}
     &&\\ 
     &&\\
     &&\\
-    $s_0$ & $- \texttt{  Add} \rightarrow$ & $s_0$ \\
+    $s_0$ & $- \texttt{  Add | Subt | Mult | Div} \rightarrow$ & $s_0$ \\
     &&\\ 
-    \cline{0-0} $\texttt{<i>}$&&\\ \cline{3-3}
-    \cline{0-0} $\texttt{<i>}$&& $\texttt{<i> + <i>}$ \\
+    \cline{0-0} $\texttt{<i2>}$&&\\ \cline{3-3}
+      \cline{0-0} $\texttt{<i1>}$&& $\texttt{<i1> } \star \texttt{ <i2>}$ \\
     \cline{0-0} \cline{3-3}
   \end{tabular}
 \end{center}
 
-$\texttt{  Add}$ pops the two integers at the bottom of the stack, adds them, and pushes the result to the stack.
+$\texttt{  Add | Subt | Mult | Div}$ pops the two integers at the bottom of the stack, performs the corresponding binary operation, and pushes the result to the stack.
 
 \begin{center}
   \begin{tabular}{P{2.5cm}|P{2.5cm}|P{2.5cm}|P{2.5cm}|}
@@ -123,7 +125,7 @@ $\texttt{  Add}$ pops the two integers at the bottom of the stack, adds them, an
   \end{tabular}
 \end{center}
 
-$\texttt{  Roll <i>}$ removes the $\texttt{<i>}^{th}$ element, where the elements are 1-indexed, from the stack and pushes it to the stack. $\texttt{Roll 1}$ makes no changes to the stack.
+$\texttt{  Roll <i>}$ removes the $\texttt{<i>}^{th}$ element, where the elements are 1-indexed, from the stack and pushes it to the stack. $\texttt{Roll 1}$ makes no changes to the stack. $\texttt{Unroll <i>}$ performs the inverse operation, placing the element at the bottom of the stack at index $\texttt{<i>}$.
 
 \begin{center}
   \begin{tabular}{P{2.5cm}|P{2.5cm}|P{6cm}|P{2.5cm}|}
@@ -131,7 +133,7 @@ $\texttt{  Roll <i>}$ removes the $\texttt{<i>}^{th}$ element, where the element
     &&&\\ 
     &&&\\
     &$s_0$&$\texttt{Form\_Closure}$&\\
-    && $- \texttt{  (<instruction list>,  <i>)} \rightarrow$ & $s_0$\\ \cline{2-2}
+    && $- \texttt{  (<num\_vals>,  <num\_ops>)} \rightarrow$ & $s_0$\\ \cline{2-2}
     \ldelim\{{3}{3cm}[\texttt{<i>} elements]&&&\\ 
     &$s_1$&&\\ \cline{4-4}
     &&& \texttt{<closure>} \\
@@ -139,116 +141,147 @@ $\texttt{  Roll <i>}$ removes the $\texttt{<i>}^{th}$ element, where the element
   \end{tabular}
 \end{center}
 
-$\texttt{  Form\_Closure (num\_ops : i,  num\_vals : i)}$ removes the bottom $\texttt{<num-vals>}$ values from the stack. Additionally, if we represent the program we are executing as a series of instructions $\texttt{Form\_Closure (<num\_ops, num\_vals), instr-1, instr-2, ..., instr-n}$, then the instructions $\texttt{intr-1, instr-2, ..., instr-{num\_ops}}$ are removed from the program and placed into the closure, and the program we are executing becomes\\
-$\texttt{instr-(num\_ops + 1), ..., instr-n}$. The values removed from the stack and the instructions removed from the program constitute the closure pushed to the stack.
+$\texttt{  Form\_Closure (num\_vals : i,  num\_ops : i)}$ removes the bottom $\texttt{<num-vals>}$ values from the stack. Additionally, if we represent the program we are executing as a series of instructions $\texttt{Form\_Closure (<num\_ops, num\_vals), instr-1, instr-2, \ldots, instr-n}$, then the instructions $\texttt{intr-1, instr-2, \ldots, instr-{num\_ops}}$ are removed from the program and placed into the closure, and the program we are executing becomes\\
+$\texttt{instr-(num\_ops + 1), \ldots, instr-n}$. The values removed from the stack and the instructions removed from the program constitute the closure pushed to the stack.
 
 \begin{center}
-  \begin{tabular}{|P{2.5cm}|P{2.5cm}|P{2.5cm}|P{1cm}|P{2.5cm}|}
+  \begin{tabular}{|P{2.5cm}|P{4cm}|P{2.5cm}|P{1cm}|P{2.5cm}|}
     \cline{1-1} \cline{3-3} \cline{5-5}
     &&&&\\ 
-    &&$s_0$&&\\
-    $s_0$&&&&\\ \cline{3-3}
-    & $- \texttt{  Apply} \rightarrow$ &&  $\rightarrow^*$ & $s_0$\\ 
-    &&$s_{closure}$&&\\ \cline{1-1}
-    $\texttt{<closure>}$&&&&\\ \cline{1-1}\cline{3-3}\cline{5-5}
-    $\texttt{<val>}$&&\texttt{<val>}&& \texttt{<val>} \\
+    $s_0$&&$s_0$&&\\
+    &&&&\\ \cline{1-1} \cline{3-3}
+      $\texttt{val-1}$&$- \texttt{  MultiApply n} \rightarrow$ &$\texttt{val-n}$& $\rightarrow^*$ & $s_0$\\ \cline{1-1} \cline{3-3}
+      $\vdots$&&$\vdots$&&\\ \cline{1-1}
+    \texttt{val-n}&&&&\\ \cline{1-1}\cline{3-3}\cline{5-5}
+      \texttt{<closure>}&&\texttt{val-n}&& \texttt{<val>} \\
     \cline{1-1} \cline{3-3} \cline{5-5}
   \end{tabular}
 \end{center}
+$\texttt{MultiApply (n: <i>)}$ expects that the bottom values of the stack the stack is a closure of the form $(\lambda x_1, \dots, x_n.\ e)$ with an empty environment. Recall that a closure contains some small stack $s_{closure}$ of values and a list of instructions $p_{closure}$. Say $p$ is the program we are executing, then after executing $\texttt{MultiApply n}$, we proceed to execute $p_{closure}\ @\ p$. Because of linearity, we expect all arguments to the function to be
+consumed.
+}
+\fi
 
-$\texttt{Apply}$ assumes that the bottom values of the stack are a closure and the argument to the function. Recall that a closure contains some small stack $s_{closure}$ of values and a list of instructions $p_{closure}$. Say $p$ is the program we are executing, then after executing $\texttt{Apply}$, we proceed to execute $p_{closure}\ @\ p$. Furthermore, $\texttt{Apply}$ pushes $s_{closure}$ onto the stack, then executes a $\texttt{Roll <i>}$ instruction, where $\texttt{<i>}$ is the number of values in $s_{closure}$, placing the argument to the function at the top of the stack.
-
-
-\section*{Translation to Stack Machine Instructions:}
-
-Translation from expression $\texttt{exp}$ to stack machine instructions occurs through a series of recursive calls to the function $\texttt{to\_stack}$. Through each call, the list of instructions is updated. The compiler also maintains a representation of the stack (to keep track of the location of variables $\texttt{<var>}$, which have string identifiers, and constants $\texttt{<const>}$ but not their values). As an instruction is added, the compiler's representation of the stack updates. What follows explains the behavior of the recursive function $\texttt{to\_stack}$ depending on the expression.
-
-\vspace{5mm}
-
-$\texttt{exp ::= <i>}$ adds a $\texttt{Push <i>}$ operation to the list of instructions. The compiler pushes $\texttt{<const>}$ to its stack representation.
-
-\medskip
-
-\hspace{10mm}$\texttt{| <var>}$ determines the location of the variable in the stack representation then adds a $\texttt{Roll <i>}$ operation to the instructions such that the variable is placed at the bottom of the stack. The stack representation is appropriately updated after removing the variable from its old location.
-
-\medskip
-
-\hspace{10mm}$\texttt{| <exp> + <exp>}$ recursively calls $\texttt{to\_stack}$ for each expression, then adds $\texttt{Add}$ to the instruction list. Then, the compiler pops the bottom two elements of the stack representation and pushes $\texttt{<const>}$.
-
-\medskip
-
-\hspace{10mm}$\texttt{| let <var> = <exp> in <exp>}$ recursively calls $\texttt{to\_stack}$ for the first expression, then pops the bottom value in the stack representation and pushes $\texttt{<var>}$. Then, the compiler calls $\texttt{to\_stack}$ for the second expression.
-
-\medskip
-
-\hspace{10mm}$\texttt {| (}$ $\lambda$ $\texttt{<var>. <exp>)}$ first statically determines which of the free variables in the stack are used in $\texttt{<exp>}$. A helper function recurses through the expression, maintaining the original stack $s_0$, a stack of free variables $s_{closure}$ used from the original stack, and a stack of local variables $s_{local}$ introduced in the expression (let-expressions and arguments to lambdas introduce local variables). 
-
-Each time a variable is referenced, the compiler searches $s_{local}$ and $s_{closure}$ for it. In the case that is not found, a $\texttt{Roll <i>}$ is added to the instruction list and the variable is removed from the original stack $s_0$ and placed on $s_{closure}$.
-
-The motivation behind shifting these referenced free variables to the bottom of the stack is to prepare the stack for a $\texttt{Form\_Closure (num\_ops, num\_vars)}$ instruction. The bottom $\texttt{num\_vars}$ values are free variables referenced in the body of the lambda. Because of linear constraints, free variables referenced in the body must be removed from the stack $s_0$ to enforce the constraint that each variable is used exactly once.
-
-After statically determining the free variables the function body uses and maneuvering them into place at the bottom of the stack, $\texttt{to\_stack}$ is called on the body of the lambda with $s_{closure}$ as the stack and the argument to the function at the bottom of $s_{closure}$. The list of instructions produced assumes that the free variables will be particular positions at the bottom of the stack, which is an assumption that holds when the function is applied. 
-
-Finally, a $\texttt{Form\_Closure (num\_ops,  num\_vars)}$ instruction with the number of instructions that constitute a program of the function body and the number of elements in $s_{closure}$ is produced. In addition, the free variables present in $s_{closure}$, which are at the bottom of the stack, are removed from the stack representation.
-
-\medskip
-
-\hspace{10mm}$\texttt{| <exp> <exp>}$ recursively calls $\texttt{to\_stack}$ for both expressions and adds $\texttt{Apply}$ to the list of instructions. Then the compiler pops two values in the stack representation and pushes $\texttt{<const>}$, which represents the result of function application.
-
-\break{}
-
-\section*{Bidirectionality:}
+\section*{Evaluating and Reversing a Program:}
 
 Suppose we have executed some program $\rho \in \texttt{program}$, which produces some value $v$ on the stack. Given a history of which instructions have been executed $\rho_h \in \texttt{program}$, where the head of the list is the most recent instruction, we can revert the stack to its original state before executing $\rho$ according to the following rules.
 
-Some instructions constitute non-injective functions $\sigma \rightarrow \sigma$, where $\sigma \in \texttt{stack}$. Therefore, we must introduce a history tape to maintain information about about the stack state when these instructions are executed. We call this history tape $\sigma_h \in \texttt{int list}$. The rules we present below show the bidirectionality for each instruction using the following tuple:
-\begin{align*}
-    (\rho \in \texttt{program}, \sigma \in \texttt{stack}, \sigma_h \in \texttt{int list}, \rho_h \in \texttt{program})
-\end{align*}
+Some instructions constitute non-injective functions $\sigma \rightarrow \sigma$. Therefore, we must introduce a history tape to maintain information about about the stack state when these instructions are executed. We call this history tape $\sigma_h$. The rules we present below show the reversibility for each instruction using the following tuple: $$(\rho, \sigma, \sigma_h \in \text{int list}, \rho_h).$$
 
-Bidirectionality Rules:
+Evaluation and Reversal Rules:
 \begin{gather*}
-    (\texttt{Push}\ i::\rho, \sigma, \sigma_h, \rho_h)\\
-    \Longleftrightarrow (\rho, \texttt{Int}\ i::\sigma, \sigma_h, \texttt{Push}\ i::\rho_h) \\ \\
-    (\texttt{Add}::\rho, \texttt{Int}\ i_1::\texttt{Int}\ i_2::\sigma, \sigma_h, \rho_h)\\
-    \Longleftrightarrow (\rho, \texttt{Int}\ (i_1+i_2)::\sigma, i_1::\sigma_h, \texttt{Add}::\rho_h)\\ \\
-    (\texttt{Roll}\ i::\rho, v_1::v_2::\dots::v_i::\sigma, \sigma_h, \rho_h)\\
-    \Longleftrightarrow (\rho, v_i::v_1::\dots::v_{i-1}::\sigma, \sigma_h, \texttt{Roll}\ i::\rho_h)\\ \\
-    (\texttt{Form\_Closure}\ (num\_ops, num\_vals)::i_1::\dots::i_{num\_ops}::\rho, v_1::\dots::v_{num\_vals}::\sigma, \sigma_h, \rho_h) \\
-    \Longleftrightarrow (\rho, \sigma, \sigma_h, \texttt{Form\_Closure}\ (num\_ops, num\_vals)::\rho_h)\\ \\
-    (\texttt{Apply}::\rho, v::\texttt{Closure}\ (\hat{\rho}, \hat{\sigma})::\sigma, \sigma, \sigma_h, \rho_h) \\
-    \Longleftrightarrow (\hat{\rho}\ @\ \rho, \hat{\sigma}\ @\ \sigma, |\hat{\rho}|::|\hat{\sigma}|::\sigma_h, \texttt{Apply}::\rho_h)
+    (\text{Push}\ n::\rho, \sigma, \sigma_h, \rho_h)\\
+    \Longleftrightarrow (\rho, \text{Int}\ n::\sigma, \sigma_h, \text{Push}\ n::\rho_h) \\ \\
+    ((\text{Add}\ |\ \text{Subt}\ |\ \text{Mult}\ |\ \text{Div})\ \text{as}\ b::\rho, \text{Int}\ n_1::\text{Int}\ n_2::\sigma, \sigma_h, b::\rho_h)\\
+    \Longleftrightarrow (\rho, \text{Int}\ (n_1 \star n_2)::\sigma, n_1::\sigma_h, b::\rho_h)\\ \\
+    (\text{Roll}\ n::\rho, v_1::v_2::\dots::v_n::\sigma, \sigma_h, \rho_h)\\
+    \Longleftrightarrow (\rho, v_n::v_1::\dots::v_{n-1}::\sigma, \sigma_h, \text{Roll}\ n::\rho_h)\\ \\
+    (\text{Unroll}\ n::\rho, v_1::v_2::\dots::v_n::\sigma, \sigma_h, \rho_h)\\
+    \Longleftrightarrow (\rho, v_2::\dots::v_n::v_1::\sigma, \sigma_h, \text{Unroll}\ n::\rho_h)\\ \\
+    (\text{Form\_Closure}\ (n_v, n_{\rho})::i_1::\dots::i_{n_\rho}::\rho, \sigma, \sigma_h, \rho_h) \\
+    \Longleftrightarrow (\rho, \text{Closure}\ (n_v, i_1::\dots::i_{n_{\rho}})::\sigma, \sigma_h, \text{Form\_Closure}\ (n_v, n_{\rho})::\rho_h)\\ \\
+    (\text{MultiApply}\ n::\rho, \text{Closure} (n, \hat{\rho})::v_1::\dots::v_n::\sigma, \sigma_h, \rho_h) \\
+    \Longleftrightarrow (\hat{\rho}\ @\ \rho, v_1::\dots::v_n @\ \sigma, |\hat{\rho}|::\sigma_h, \text{MultiApply}\ n::\rho_h)
 \end{gather*}
 
-Now we will discuss the non-injective functions and the approach to maintaining the history tape. When reversing an $\texttt{Add}$ instruction, one cannot uniquely determine two integers whose sum is is the integer at the top of the stack, therefore, when adding $\texttt{Int}\ i_1$ and $\texttt{Int} i_2$, we place $i_1$ onto the history since the function $(+) i_1$ is injective.
-
-Likewise, when reversing an $\texttt{Apply}$ operation, one cannnot uniquely determine which instructions belong in the closure and which stack values are used in the closure, therefore to restore $\texttt{Closure} (\hat{\rho}, \hat{\sigma})$, we must add the lengths of $\hat{\rho}$ and $\hat{\sigma}$ to the history tape upon executing an $\texttt{Apply}$ instruction.
-
-\section*{Further Aims:}
-
-The $\texttt{Apply}$ instruction may be injective because of the linear constraints in our language. Recall that in our stack-machine, we can define a well-formed closure, where all the local variables of the closure are consumed when executing the body of the closure, using the property $\texttt{wf}$.
+Additionally, every closure has the following property. Essentially, every closure, after executing the body of the closure, consumes its arguments.
 \begin{align*}
-    \vec{x} = (\hat{\rho}_x \in \texttt{program}, \hat{\sigma}_x \in \texttt{stack}, \rho_x \in \texttt{program}, \sigma_x \in \texttt{stack})\\
-    \texttt{wf}\ (\vec{x}, v \in \texttt{stack\_value}) \quad \myeq \quad (\texttt{Apply}::\rho, v::\texttt{Closure}\ (\hat{\rho}, \hat{\sigma})::\sigma, \dots) &\Longrightarrow\\
-    (\hat{\rho}\ @\ \rho, v::\hat{\sigma}\ @\ \sigma, \dots) &\Longrightarrow^* (\rho, v'::\sigma, \dots)
+    \vec{\sigma} &= (n, \sigma, \hat{\sigma}\ \text{where} |\hat{\sigma}| = n)\\
+    \vec{\rho} &= (\rho, \hat{\rho})
 \end{align*}
-Recall that to reverse $\texttt{Apply}$, we must split the program and the stack such that we restore the original closure. We define this split by the following:
 \begin{align*}
-    \texttt{splits}\ (\rho', \sigma', v, \vec{x}) \quad \myeq \quad \rho' = \hat{\rho}_x\ @\ \rho_x \wedge \sigma' = \hat{\sigma}_x\ @\ \sigma_x: \ \texttt{wf}\ (\vec{x}, v)
-\end{align*}
-Using the linear constraints of the language, if we could prove the following proposition, then $\texttt{Apply}$ would be injective.
-\begin{align*}
-    \texttt{Prop}: \quad \forall \rho', \sigma'.\ \exists\ \vec{x}\ \texttt{splits}\ (\rho', \sigma', \vec{x}) \wedge \exists\ \vec{y}\ \texttt{splits}\ (\rho', \sigma', \vec{y}) \Longrightarrow \vec{x} = \vec{y}
+\textbf{Well-Formed Closure Property}: \\
+    \text{wf} (\vec{\sigma}, \vec{\rho})\ &\myeq\ (\text{MultiApply}\ n::\rho, \text{Closure} (n, \hat{\rho})::\hat{\sigma}::\sigma, \dots)\\
+    &\Longrightarrow (\hat{\rho}\ @\ \rho, \hat{\sigma} @\ \sigma, \dots) \Longrightarrow^* (\rho, v::\sigma, \dots)
 \end{align*}
 
-The constraints placed on the language currently are not enough to prove $\texttt{Prop}$. We must require that every well-formed closure contains at least one instruction, because otherwise, a valid split of $\rho'$ would trivially always be $\rho' = \texttt{[]}\ @\ \rho'$.
+\iffalse{Now we will discuss the non-injective functions and the approach to maintaining the history tape. When reversing an $\text{Add}$ instruction (or in general an arithmetic binary operation), one cannot uniquely determine two integers whose sum is is the integer at the top of the stack, therefore, when adding $\text{Int}\ n_1$ and $\text{Int}\ n_2$, we place $n_1$ onto the history since the function $(+)\ n_1$ is injective. This is the case for the other binary operations, and for Div,
+the two integers must divide evenly.
 
-Additionally, consider the following counterexample as to why $\texttt{Prop}$ may not hold. The body of the function $(\lambda x.\ \texttt{let}\ sum = x + 1\ \texttt{in}\ sum)$ translates to the following stack-machine instructions:
+Likewise, when reversing an $\text{MultiApply}\ n$ operation, one cannnot uniquely determine which instructions belong in the closure and which stack values are used in the closure, therefore to restore $\text{Closure} (n, \hat{\sigma})$, we must add the lengths of $\hat{\sigma}$ to the history tape upon executing an $\text{MultiApply}\ n$ instruction.
+}
+\fi
+
+\section*{Translation to Stack Machine Instructions:}
+
+Recall that we are working with lifted lambda expressions. All the operations change the size of the stack predictably. Here is how each operation affects the size of the stack:
 \begin{align*}
-    \rho_c := \texttt{[Roll 1; Push 1; Add; Roll 1]}
+    \text {Push}\ i\ &\rightarrow\ +1\\
+    (\text{Add}\ |\ \text{Subt}\ |\ \text{Mult}\ |\ \text{Div})\ &\rightarrow\ -1\\
+    \text{Roll}\ \_\ |\ \text{Unroll}\ \_ \ &\rightarrow\ 0\\
+    \text {Form\_Closure}\ \_\ &\rightarrow\ +1\\
+    \text {MultiApply}\ n\ &\rightarrow\ -n + 1\\
 \end{align*}
 
-However, one could choose to emit the last instruction. Therefore, \\ $\texttt{Closure}\ (\texttt{[Roll 1; Push 1; Add]}, \texttt{[]})$ and $\texttt{Closure}\ (\rho_c, [])$ are both valid well-formed closures. Furthermore, $\texttt{Closure}\ (\texttt{[Roll 1]}, \texttt{[]})$ is also a well-formed closure. We could decide to remove $\texttt{Roll 1}$ altogether from all programs, but body of the identity function $(\lambda x.\ x)$ would only be representable as an empty program, which would violate our constraint that every closure must contain at least one instruction.
+Notice that Form\_Closure does not take any values from the stack because the body of a $\lambda$-expression contains no free variables. 
+Therefore, we can classify the instructions into grow ops and shrink ops.
+\begin{align*}
+    i_g ::=&\ \text{Push}\ n\ |\ \text{Form\_Closure}\ (n_v, n_{\rho})\\
+    \rho_g ::=&\ i_g\ \text{list}\\
+    i_s ::=&\ \text {Add}\ |\ \text {Subt}\ |\ \text {Mult}\ |\ \text {Div}\\
+    & |\ \text{Roll}\ n\ |\ \text {Unroll}\ n\ |\ \text{MultiApply}\ n\\
+    \rho_s ::=&\ i_s\ \text{list}
+\end{align*}
 
-Therefore, $\texttt{Prop}$ is currently not true under the current constaints of our stack-machine. A further aim of mine is adding constraints such that $\texttt{Prop}$ holds true. 
+Let us define the following property.
+\begin{align*}
+    \textbf{Grow-Shrink Property}:\\
+    \text{gs}\ (\rho\ \text{where}\ |\rho| > 0)\ \myeq\ \exists \rho_g,\ \rho_s.\ \rho = \rho_g\ @\ \rho_s
+\end{align*}
+    
+    The translation we produce has important properties that may allow MultiApply to be injective. For every program $\rho$ produced by the translation, gs ($\rho$) holds. Additionally, for every closure Closure ($n, \hat{\rho})$, gs ($\hat{\rho}$) holds. 
+
+The translation is produced using many careful roll and unroll operations. It is defined in compiler.ml.
+
+\section*{Limitations of Lambda-Lifting:}
+
+Unfortunately, not all sample programs provided work properly (sample\_programs/app5\_not\_working.lam). Though the closures in the lambda-lifted expressions have no free variables (and thus empty environments), this does not guarantee that additional closures formed as the result of partial application have empty environments. Consider the following illustrative example of an expression in the target lambda-lifted language.
+\begin{align*}
+    \text{let}\ f\ &=\ (\lambda\ x\ y.\ x + y)\ \text{in}\\
+    \text{let}\ g\ &=\ (\lambda\ f.\ f\ 1)\ \text{in}\\
+    g\ f\ 1
+\end{align*}
+
+After evaluating $(g\ f)$, we produce the closure $\{(\lambda\ x\ y.\ x + y), [x = 1]\}$, which we do not have the capacity to represent in our stack-machine. Allowing such closures may cause the grow-shrink properties outlined in the previous section to no longer hold.
+
+
+\section*{Reversability of MultiApply:}
+
+The $\texttt{MultiApply}$ instruction may be injective because of the linear constraints in our language. Recall that we define the Well-Formed Closure Property and the Grow-Shrink Property. Recall that to reverse $\text{MultiApply}$, we must split the program and the stack such that we restore the original closure. We define this split by the following. The vectors used in these definitions where defined with the Well-Formed Closure Property.
+\begin{align*}
+    \text{splits}\ (\rho', \vec{\rho}, \vec{\sigma})\ \myeq\ \rho' = \hat{\rho}\ @\ \rho\ \wedge : \ \texttt{wf}\ (\vec{\rho}, \vec{\sigma})
+\end{align*}
+If we could prove the following proposition, then $\texttt{MultiApply}$ would be injective.
+\begin{align*}
+    \text{InjApply}: \quad \forall \rho'.\ \exists\ \vec{\rho_a}.\ \text{splits}\ (\rho', \vec{\rho_a}, \vec{\sigma}) \wedge \exists\ \vec{\rho_b}\ \text{splits}\ (\rho', \vec{\rho_b}, \vec{\sigma}) \Longrightarrow \vec{\rho_a} = \vec{\rho_b}
+\end{align*}
+
+In the test cases we have tried, InjApply seems to hold, and here is the pseudocode that finds the appropriate split.
+\begin{align*}
+    \text{let}\ &rev\ n\ (\hat{\rho}, \rho) =\\
+    &\text{if}\ n = 1  \wedge |\hat{\rho}| > 0\\ 
+    &\text{then}\ (\hat{\rho}, \rho)\ \text{else match}\ \rho\ \text{with}\\
+    & \quad \text{$|$ Push \_ as $p::t \rightarrow$ } rev\ (n + 1)\ (p::\hat{\rho}, t)\\
+    & \quad \text{$|$ (Add $|$ Subt $|$ Mult $|$ Div) as $b::t \rightarrow$ } rev\ (n - 1)\ (b::\hat{\rho}, t)\\
+    & \quad \text{$|$ (Unroll \_ $|$ Roll \_) as $r::t \rightarrow$ } rev\ n\ (r::\hat{\rho}, t)\\
+    & \quad \text{$|$ MultiApply $m$ as $ma::t \rightarrow$ } rev\ (n - m)\ (ma::\hat{\rho}, t)
+\end{align*}
+
+There are cases missing from this match, but Form\_Closure is not expected in the body of a closure. If the $n =1$ condition does not hold and $\rho = []$, then reversing MultiApply has failed. Note that we require every closure to have at least one instruction. Otherwise a valid split of $\rho'$ would trivially be $\rho' = []\ @\ \rho'$.
+
+\break{}
+
+To reverse MultiApply $n$ given the program $\rho'$, we call $rev\ n\ ([], \rho')$ which provides the split $\rho' = \hat{\rho_g}\ @ \ \hat{\rho_s}\ @\ \rho$, where $\hat{\rho_g}\ @\ \hat{\rho_s}$ is the body of the closure we aim to restore (recall that this closure body satisfies the Grow-Shrink Property). 
+
+Let $n_0 = n$. Let ${\{n_m\}}_m$ be the sequence of $n$ through the recursive calls, where $n_m$ is the size of the local stack (of the closure) after executing the first $m$ instructions of $\rho'$. Note that each instruction of $\rho_g$ increases $n$ by 1. Therefore, $n_{|\rho_g|} = n + |\rho_g|$. Because our closure is well-formed, after executing $\rho_g\ @\ \rho_s$, all arguments to the closure will be consumed to produce a result value. Therefore, $n_{|\rho_g\ @\ \rho_s|} = 1$. This is by no means a proof, but
+hopefully the explanation provides intuition to the argument that InjApply holds.
+
+\section*{Future Aims:}
+
+We need to prove that the translation from lifted lambda expression to machine operations is sound and that this translation satisfies the Grow-Shrink Property.
+
+Because of the limitations of lifted-lambda expressions, we need to translate our expressions to a target language without partial application.
+
+The injectiveness of MultiApply must be proved rigorously. 
+
 \end{document}
