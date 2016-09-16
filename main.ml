@@ -56,7 +56,7 @@ let () =
       let repr' = Stack_Var var::repr in
       (e', repr', input_num + 1)) init_stack (parsed_exp, [], 1) in
 
-  let lifted_e = Lifting.lift e in
+  let lifted_e = if Lifting.is_target_prog e then e else Lifting.lift e in
   let () = assert (Lifting.is_target_prog lifted_e) in
 
   (* (4) Pretty print the expression *)

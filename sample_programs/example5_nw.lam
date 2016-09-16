@@ -1,0 +1,3 @@
+let f = (lambda x. (lambda y. x + y)) in
+let g = (lambda f. f 1) in
+g (f 1)

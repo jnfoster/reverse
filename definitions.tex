@@ -1,0 +1,100 @@
+\documentclass[11pt]{article}
+% decent example of doing mathematics and proofs in LaTeX.
+% An Incredible degree of information can be found at
+% http://en.wikibooks.org/wiki/LaTeX/Mathematics
+
+% Use wide margins, but not quite so wide as fullpage.sty
+\marginparwidth0.3in 
+\oddsidemargin0.2in 
+\evensidemargin0.2in 
+\marginparsep0.2in
+\topmargin 0.2in 
+\textwidth 6in \textheight 8 in
+% That's about enough definitions
+
+\usepackage{amsmath}
+\usepackage{upgreek}
+\usepackage{enumerate}
+\usepackage{graphicx}
+\usepackage{enumitem}
+\usepackage{amssymb}
+\usepackage{mathtools}
+\usepackage{array}
+\usepackage{verbatim}
+\newcolumntype{P}[1]{>{\centering\arraybackslash}p{#1}}
+\usepackage{multirow,bigdelim}
+
+\newcommand\myeq{\stackrel{\mathclap{\normalfont\mbox{def}}}{=}}
+
+
+\begin{document}
+\title{Linear Lambda Calculus Compiler Definitions}
+\author{CS 4999: Anna Yesypenko Supervised by Professor Nate Foster}
+\maketitle
+
+\section*{Source Language}
+The following grammar defines an expression $e$, where $x$ is a variable and $n$ is an integer.
+\begin{align*}
+    b\ &::=\ +\ |\ -\ |\ /\ |\ *\\
+    e\ &::=\ n\ |\ x\ |\ e_1\ b\ e_2\ |\ \text{let}\ x\ =\ e_1\ \text{in}\ e_2\\
+    &|\ \lambda\ x.\ e\ |\ e_1\ e_2
+\end{align*}
+\section*{Stack Machine Instruction Set:}
+
+An instruction can be any of the following:
+\begin{align*}
+    i\ &::=\ \text {Push}\ n\ |\ \text {Add}\ |\ \text {Subt}\ |\ \text {Mult}\ |\ \text {Div}\\
+    & |\ \text{Roll}\ n\ |\ \text {Unroll}\ n\ |\ \text{Form\_Closure}\ (n_v, n_{\rho})\ |\ \text{MultiApply}\ n
+\end{align*}
+Here we define machine program $p$, stack $s$, and stack value $v$:
+\begin{align*}
+    \rho\ &::=\ i\ \text{list}\\
+    v\ &::=\ \text {Int}\ n\ |\ \text {Closure}\ (n, \rho) \\
+    \sigma &::=\ v\ \text{list}\\
+\end{align*}
+
+\section*{Evaluating and Reversing Target Language:}
+
+Each tuple is of the form $(\rho, \sigma, \sigma_h \in\ \text{int list}, \rho_h)$. 
+\begin{gather*}
+    (\text{Push}\ n::\rho, \sigma, \sigma_h, \rho_h)\\
+    \Longleftrightarrow (\rho, \text{Int}\ n::\sigma, \sigma_h, \text{Push}\ n::\rho_h) \\ \\
+    ((\text{Add}\ |\ \text{Subt}\ |\ \text{Mult}\ |\ \text{Div})\ \text{as}\ b::\rho, \text{Int}\ n_1::\text{Int}\ n_2::\sigma, \sigma_h, b::\rho_h)\\
+    \Longleftrightarrow (\rho, \text{Int}\ (n_1 \star n_2)::\sigma, n_1::\sigma_h, b::\rho_h)\\ \\
+    (\text{Roll}\ n::\rho, v_1::v_2::\dots::v_n::\sigma, \sigma_h, \rho_h)\\
+    \Longleftrightarrow (\rho, v_n::v_1::\dots::v_{n-1}::\sigma, \sigma_h, \text{Roll}\ n::\rho_h)\\ \\
+    (\text{Unroll}\ n::\rho, v_1::v_2::\dots::v_n::\sigma, \sigma_h, \rho_h)\\
+    \Longleftrightarrow (\rho, v_2::\dots::v_n::v_1::\sigma, \sigma_h, \text{Unroll}\ n::\rho_h)\\ \\
+    (\text{Form\_Closure}\ (n_v, n_{\rho})::i_1::\dots::i_{n_\rho}::\rho, \sigma, \sigma_h, \rho_h) \\
+    \Longleftrightarrow (\rho, \text{Closure}\ (n_v, i_1::\dots::i_{n_{\rho}})::\sigma, \sigma_h, \text{Form\_Closure}\ (n_v, n_{\rho})::\rho_h)\\ \\
+    (\text{MultiApply}\ n::\rho, \text{Closure} (n, \hat{\rho})::v_1::\dots::v_n::\sigma, \sigma_h, \rho_h) \\
+    \Longleftrightarrow (\hat{\rho}\ @\ \rho, v_1::\dots::v_n @\ \sigma, |\hat{\rho}|::\sigma_h, \text{MultiApply}\ n::\rho_h)
+\end{gather*}
+
+\break{}
+
+\section*{Properties of compiled programs:}
+
+Every closure has the following property. After executing the body of the closure, consumes its arguments. Let $\vec{\sigma} = (n, \sigma, \hat{\sigma}\ \text{where} |\hat{\sigma}| = n)$ and $\vec{\rho} = (\rho, \hat{\rho})$. 
+\begin{align*}
+\textbf{Well-Formed Closure Property}: \\
+    \text{wf} (\vec{\sigma}, \vec{\rho})\ &\myeq\ (\text{MultiApply}\ n::\rho, \text{Closure} (n, \hat{\rho})::\hat{\sigma}::\sigma, \dots)\\
+    &\Longrightarrow (\hat{\rho}\ @\ \rho, \hat{\sigma} @\ \sigma, \dots) \Longrightarrow^* (\rho, v::\sigma, \dots)
+\end{align*}
+
+Notice that Form\_Closure does not take any values from the stack because the body of a $\lambda$-expression contains no free variables. 
+Therefore, we can classify the instructions into grow ops and shrink ops.
+\begin{align*}
+    i_g ::=&\ \text{Push}\ n\ |\ \text{Form\_Closure}\ (n_v, n_{\rho})\\
+    \rho_g ::=&\ i_g\ \text{list}\\
+    i_s ::=&\ \text {Add}\ |\ \text {Subt}\ |\ \text {Mult}\ |\ \text {Div}\\
+    & |\ \text{Roll}\ n\ |\ \text {Unroll}\ n\ |\ \text{MultiApply}\ n\\
+    \rho_s ::=&\ i_s\ \text{list}
+\end{align*}
+
+Every program produced by our compiler has the following property.
+\begin{align*}
+    \textbf{Grow-Shrink Property}:\\
+    \text{gs}\ (\rho\ \text{where}\ |\rho| > 0)\ \myeq\ \exists \rho_g,\ \rho_s.\ \rho = \rho_g\ @\ \rho_s
+\end{align*}
+\end{document}
