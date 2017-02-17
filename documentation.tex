@@ -118,24 +118,23 @@ The rules we present below show the reversibility for each instruction using the
 
 All the operations change the size of the stack $\sigma$.
 \begin{align*}
-        (\text{Add}\ |\ \text{Subt}\ |\ \text{Mult}\ |\ \text{Div})\ &\rightarrow\ -1\\
-        \text {Save\_Function} &\rightarrow\ +0\\
-        \text {Form\_Closure} &\rightarrow\ +0\\
+        \text{Add $|$ Subt $|$ Mult $|$ Div}\ &\rightarrow\ -1\\
+        \text {Save\_Function \_}\ &\rightarrow\ +0\\
+        \text {Form\_Closure \_}\ &\rightarrow\ +0\\
         \text {Apply}\ &\rightarrow\ -1\\
-        \text{Roll}\  |\ \text{Unroll} \ &\rightarrow\ +0\\
-        \text {Compose\_Tuple}\ k\ &\rightarrow\ -k + 1\\
-        \text {Decompose\_Tuple}\ k\ &\rightarrow\ +k - 1\\
-        \text {Push}\ &\rightarrow\ +1\\
+        \text{Roll \_ $|$ Unroll \_}\ &\rightarrow\ +0\\
+        \text {Compose\_Tuple $k$}\ &\rightarrow\ -k + 1\\
+        \text {Decompose\_Tuple $k$}\ &\rightarrow\ +k - 1\\
+        \text {Push \_}\ &\rightarrow\ +1\\
 \end{align*}
 
 Therefore, we can classify the instructions into grow ops and shrink ops.
 \begin{align*}
-    i_g ::=& \text{Push | Compose\_Tuple 0 | Decompose\_Tuple $k > 1$}\\
-    \rho_g ::=& \text{$i_g$ list}\\
-    i_s ::=&\ \text {Add}\ |\ \text {Subt}\ |\ \text {Mult}\ |\ \text {Div}\\
-    & |\ \text{Save\_Function \_ | Form\_Closure \_ | Apply}\\
-    & |\ \text{Roll}\ n\ |\ \text {Unroll}\ n\}\\
-    & |\ \text{Compose\_Tuple $k>0$ | Decompose\_Tuple $k \le 1$ | Push \_}\\
+    i_g ::=\ & \text{Push \_ $|$ Compose\_Tuple 0 $|$ Decompose\_Tuple $k > 1$}\\
+    \rho_g ::=\ &\text{$i_g$ list}\\
+    i_s ::=\ &\text{Add $|$ Subt $|$ Mult $|$ Div}\\
+    &\text{$|$ Save\_Function \_ $|$ Form\_Closure \_ $|$ Apply}\\
+    &\text{$|$ Roll \_ $|$ Unroll \_ $|$ Compose\_Tuple $k>0$ $|$ Decompose\_Tuple $k \le 1$}\\
     \rho_s ::=&\ i_s\ \text{list}
 \end{align*}
 
