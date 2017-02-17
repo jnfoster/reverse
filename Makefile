@@ -1,13 +1,12 @@
 MAIN=rev
 
-OBJS = util.cmo ast.cmo state.cmo lifting.cmo lexer.cmo parser.cmo machine.cmo pprint.cmo eval.cmo compiler.cmo main.cmo
+OBJS = util.cmo ast.cmo eval_lambda.cmo state.cmo lexer.cmo parser.cmo machine.cmo eval_machine.cmo
 
 %.cmo : %.ml
 	ocamlc -c -g $<
 
 %.cmi : %.mli
 	ocamlc -c -g $<
-
 
 $(MAIN): $(OBJS)
 	ocamlc -g -o $(MAIN) $(OBJS)
@@ -25,4 +24,4 @@ parser.mli : parser.mly
 	ocamlyacc -q $<
 
 clean:
-	rm -f *.cmo *.cmi lexer.ml parser.ml parser.mli $(MAIN)
+	rm -f *.cmo *.cmi *.log *.aux lexer.ml parser.ml parser.mli $(MAIN)

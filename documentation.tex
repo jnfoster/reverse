@@ -1,30 +1,20 @@
 \documentclass[11pt]{article}
-% decent example of doing mathematics and proofs in LaTeX.
-% An Incredible degree of information can be found at
-% http://en.wikibooks.org/wiki/LaTeX/Mathematics
 
-% Use wide margins, but not quite so wide as fullpage.sty
 \marginparwidth0.5in 
 \oddsidemargin0.25in 
 \evensidemargin0.25in 
 \marginparsep0.25in
 \topmargin 0.25in 
 \textwidth 6in \textheight 8 in
-% That's about enough definitions
 
 \usepackage{amsmath}
 \usepackage{upgreek}
 \usepackage{enumerate}
-\usepackage{graphicx}
-\usepackage{enumitem}
-\usepackage{amssymb}
-\usepackage{mathtools}
-\usepackage{array}
 \usepackage{verbatim}
-\newcolumntype{P}[1]{>{\centering\arraybackslash}p{#1}}
-\usepackage{multirow,bigdelim}
+\usepackage{stmaryrd}
+\usepackage{listings}
 
-\newcommand\myeq{\stackrel{\mathclap{\normalfont\mbox{def}}}{=}}
+\newcommand*{\br}[1]{\llbracket{#1}\rrbracket}
 
 
 \begin{document}
@@ -34,254 +24,126 @@
 
 \section*{Overview:}
 
-Given a linear lambda calculus expression, the compiler translates the expression to a lambda-lifted expression and then to stack machine instructions. Once the set of instructions have been produced, the expression can be evaluated to a value $v$, which can either be an integer or a function closure.
-
-\medskip
-The following grammar defines an expression $e$, where $x$ is a variable and $n$ is an integer.
-
+We compile the source language, linear lambda calculus programs $e$
 \begin{align*}
     b\ &::=\ +\ |\ -\ |\ /\ |\ *\\
     e\ &::=\ n\ |\ x\ |\ e_1\ b\ e_2\ |\ \text{let}\ x\ =\ e_1\ \text{in}\ e_2\\
     &|\ \lambda\ x.\ e\ |\ e_1\ e_2
 \end{align*}
-
-The compiler assumes that expressions are well-typed. In expressions of the form $e_1\ b\ e_2$, both $e_1$ and $e_2$ must evaluate to integers. Expressions of the form $e_1\ e_2$ are assumed to be valid function applications. Since the language is linear, each variable is assumed to be used exactly once.
-
-\section*{Lambda Lifting Expressions:}
-
-The following grammar defines a lambda-lifted program $p$.
-
+to the target language, stack machine programs $\rho$
 \begin{align*}
-    p\ &::=\ \text{let}\ x\ =\ \lambda\ x_1, \ldots, x_n.\ e\ \text{in}\ p\ |\ e\\
-    b\ &::=\ +\ |\ -\ |\ /\ |\ *\\
-    e\ &::=\ n\ |\ x\ |\ e_1\ b\ e_2\ |\ e_1\ e_2
+    binop\ &::=\ \text{Add $|$ Subt $|$ Mult $|$ Div}\\
+    funop\ &::= \text{Save\_Function ($fun\_id, k$) $|$ Form\_Closure ($fun\_id$) $|$ Apply}\\
+    rollop\ &::= \text{Roll $k$ $|$ Unroll $k$}\\
+    tupleop\ &::= \text{Construct\_Tuple $k$ $|$ Deconstruct\_Tuple $k$}\\
+    instr\ &::=\ binop\ |\ funop\ |\ rollop\ |\ tupleop\ |\ \text{Push $n$}\\
+    \rho &::=\ instr\ \text{list}
+\end{align*}
+which operate on stacks $\sigma$ and $\sigma_f$
+\begin{align*}
+    \sigma_f\ &::=\ (fun\_id, \rho)\ \text{list}\\
+    tup\ &::=\ \text{Tuple $(v_1, \dots, v_k)$}\\
+    v\ &::=\ \text {Int $n\ |\ tup\ |$ Closure ($\rho, tup$)}\\
+    \sigma &::=\ v\ \text{list}
 \end{align*}
 
-The expressions $e$ are $\lambda$-free, meaning they do not contain $\lambda$-abstractions or $\text{let}$-expressions. The important property that lambda lifting gives is that $\lambda$-expressions are closed. Therefore, the closures they produce have empty environments.
+\break{}
 
-\section*{Stack Machine Instruction Set:}
+\section*{Defunctionalization:}
 
-An instruction can be any of the following:
+Given a lambda-calculus program $p$, defunctionalization produces a first-order language. That is, functions are no longer considered to be values. Instead, $l\ ::=\ (\lambda x.\ e)$ is represented as $C_l(v_1, \dots, v_n)$, where $C_l$ uniquely identifies the function $l$, and $v_1, \dots, v_n$ are the values of the variables $x_1, \dots, x_n$ which are free in $l$.
 
+We define the translation from lambda-calculus program to first-order program.
 \begin{align*}
-    i\ &::=\ \text {Push}\ n\ |\ \text {Add}\ |\ \text {Subt}\ |\ \text {Mult}\ |\ \text {Div}\\
-    & |\ \text{Roll}\ n\ |\ \text {Unroll}\ n\ |\ \text{Form\_Closure}\ (n_v, n_{\rho})\ |\ \text{MultiApply}\ n
+        \br{x} &= x\\
+            \br{\lambda x.\ e} &= C_{\lambda x.\ e} (x_1, \dots, x_n),\ \text{where $x_1, \dots, x_n$ are free in $\lambda x.\ e$}\\
+                \br{e_1\ b\ e_2} &= \br{e_1}\ b\ \br{e_2}\\
+                    \br{\text{let}\ x = e_1\ \text{in}\ e_2} &= \br{(\lambda x.\ e_2)\ e_1}\\
+                        \br{e_1\ e_2} &= \text{apply}(\br{e_1}, \br{e_2})
 \end{align*}
 
-Here we define machine program $p$, stack $s$, and stack value $s\_v$:
+Thus a lambda calculus program $p$ is translated to a first-order program as such:
+\begin{lstlisting}[mathescape = true]
+let rec apply_defunc (f, arg) = 
+    match f with
+        | C$_{\lambda x.\ e} (x_1, \dots, x_n)$ -> let $x = \arg$ in $\br{e}$
+        | $\dots$ in
+        $\br{p}$
+\end{lstlisting}
 
-\begin{align*}
-    \rho\ &::=\ i\ \text{list}\\
-    v\ &::=\ \text {Int}\ n\ |\ \text {Closure}\ (n, \rho) \\
-    \sigma &::=\ v\ \text{list}\\
-\end{align*}
+\section*{Analogue to Defunctionalization:}
 
-\iffalse{Now we pictorally describe what each instruction achieves. 
+The values Closure ($fun\_id$, Tuple $(v_1, \dots, v_k)$) on stack $\sigma$ are analogous to the constructors $C_{fun\_id} (v_1, \dots, v_k)$.\\
 
+The function stack $\sigma_f$ stores the programs $\hat{\rho}$ corresponding to each case of the dispatch function `apply\_defunc'. At the beginning of a program $\rho$, there will be a series of Save\_Function instructions to initialize $\sigma_f$.
 
-\begin{center}
-  \begin{tabular}{|P{2.5cm}|P{2.5cm}|P{2.5cm}|}
-    \cline{0-0} \cline{3-3}
-    &&\\ 
-    &&\\
-    &&\\
-    $s_0$ & $- \texttt{  Push <i>} \rightarrow$ & $s_0$ \\
-    &&\\
-    &&\\ \cline{3-3}
-    && $\texttt{<i>}$ \\
-    \cline{0-0} \cline{3-3}
-  \end{tabular}
-\end{center}
+\break{}
 
-$\texttt{  Push <i>}$ simply pushes an integer to the bottom of the stack.
+\section*{Executing and Reversing a Program:}
 
-\begin{center}
-    \begin{tabular}{|P{2.5cm}|P{6cm}|P{2.5cm}|}
-    \cline{0-0} \cline{3-3}
-    &&\\ 
-    &&\\
-    &&\\
-    $s_0$ & $- \texttt{  Add | Subt | Mult | Div} \rightarrow$ & $s_0$ \\
-    &&\\ 
-    \cline{0-0} $\texttt{<i2>}$&&\\ \cline{3-3}
-      \cline{0-0} $\texttt{<i1>}$&& $\texttt{<i1> } \star \texttt{ <i2>}$ \\
-    \cline{0-0} \cline{3-3}
-  \end{tabular}
-\end{center}
+The rules we present below show the reversibility for each instruction using the following tuple: $$(\rho, \sigma, \sigma_f, \sigma_h \in \text{int list}, \rho_h).$$
 
-$\texttt{  Add | Subt | Mult | Div}$ pops the two integers at the bottom of the stack, performs the corresponding binary operation, and pushes the result to the stack.
-
-\begin{center}
-  \begin{tabular}{P{2.5cm}|P{2.5cm}|P{2.5cm}|P{2.5cm}|}
-    \cline{2-2} \cline{4-4}
-    &&&\\ 
-    &$s_0$&&$s_0$\\
-    &&&\\ \cline{2-2}\cline{4-4}
-    \ldelim\{{4}{3cm}[\texttt{<i>} elements] &\texttt{<val>} & $- \texttt{  Roll <i>} \rightarrow$ & \\ \cline{2-2}
-    &&&$s_1$\\ 
-    &$s_1$&&\\ \cline{4-4}
-    &&& $\texttt{<value>}$ \\
-    \cline{2-2} \cline{4-4}
-  \end{tabular}
-\end{center}
-
-$\texttt{  Roll <i>}$ removes the $\texttt{<i>}^{th}$ element, where the elements are 1-indexed, from the stack and pushes it to the stack. $\texttt{Roll 1}$ makes no changes to the stack. $\texttt{Unroll <i>}$ performs the inverse operation, placing the element at the bottom of the stack at index $\texttt{<i>}$.
-
-\begin{center}
-  \begin{tabular}{P{2.5cm}|P{2.5cm}|P{6cm}|P{2.5cm}|}
-    \cline{2-2} \cline{4-4}
-    &&&\\ 
-    &&&\\
-    &$s_0$&$\texttt{Form\_Closure}$&\\
-    && $- \texttt{  (<num\_vals>,  <num\_ops>)} \rightarrow$ & $s_0$\\ \cline{2-2}
-    \ldelim\{{3}{3cm}[\texttt{<i>} elements]&&&\\ 
-    &$s_1$&&\\ \cline{4-4}
-    &&& \texttt{<closure>} \\
-    \cline{2-2} \cline{4-4}
-  \end{tabular}
-\end{center}
-
-$\texttt{  Form\_Closure (num\_vals : i,  num\_ops : i)}$ removes the bottom $\texttt{<num-vals>}$ values from the stack. Additionally, if we represent the program we are executing as a series of instructions $\texttt{Form\_Closure (<num\_ops, num\_vals), instr-1, instr-2, \ldots, instr-n}$, then the instructions $\texttt{intr-1, instr-2, \ldots, instr-{num\_ops}}$ are removed from the program and placed into the closure, and the program we are executing becomes\\
-$\texttt{instr-(num\_ops + 1), \ldots, instr-n}$. The values removed from the stack and the instructions removed from the program constitute the closure pushed to the stack.
-
-\begin{center}
-  \begin{tabular}{|P{2.5cm}|P{4cm}|P{2.5cm}|P{1cm}|P{2.5cm}|}
-    \cline{1-1} \cline{3-3} \cline{5-5}
-    &&&&\\ 
-    $s_0$&&$s_0$&&\\
-    &&&&\\ \cline{1-1} \cline{3-3}
-      $\texttt{val-1}$&$- \texttt{  MultiApply n} \rightarrow$ &$\texttt{val-n}$& $\rightarrow^*$ & $s_0$\\ \cline{1-1} \cline{3-3}
-      $\vdots$&&$\vdots$&&\\ \cline{1-1}
-    \texttt{val-n}&&&&\\ \cline{1-1}\cline{3-3}\cline{5-5}
-      \texttt{<closure>}&&\texttt{val-n}&& \texttt{<val>} \\
-    \cline{1-1} \cline{3-3} \cline{5-5}
-  \end{tabular}
-\end{center}
-$\texttt{MultiApply (n: <i>)}$ expects that the bottom values of the stack the stack is a closure of the form $(\lambda x_1, \dots, x_n.\ e)$ with an empty environment. Recall that a closure contains some small stack $s_{closure}$ of values and a list of instructions $p_{closure}$. Say $p$ is the program we are executing, then after executing $\texttt{MultiApply n}$, we proceed to execute $p_{closure}\ @\ p$. Because of linearity, we expect all arguments to the function to be
-consumed.
-}
-\fi
-
-\section*{Evaluating and Reversing a Program:}
-
-Suppose we have executed some program $\rho \in \texttt{program}$, which produces some value $v$ on the stack. Given a history of which instructions have been executed $\rho_h \in \texttt{program}$, where the head of the list is the most recent instruction, we can revert the stack to its original state before executing $\rho$ according to the following rules.
-
-Some instructions constitute non-injective functions $\sigma \rightarrow \sigma$. Therefore, we must introduce a history tape to maintain information about about the stack state when these instructions are executed. We call this history tape $\sigma_h$. The rules we present below show the reversibility for each instruction using the following tuple: $$(\rho, \sigma, \sigma_h \in \text{int list}, \rho_h).$$
-
-Evaluation and Reversal Rules:
+\textbf{Binomial arithmetic operations:}
 \begin{gather*}
-    (\text{Push}\ n::\rho, \sigma, \sigma_h, \rho_h)\\
-    \Longleftrightarrow (\rho, \text{Int}\ n::\sigma, \sigma_h, \text{Push}\ n::\rho_h) \\ \\
-    ((\text{Add}\ |\ \text{Subt}\ |\ \text{Mult}\ |\ \text{Div})\ \text{as}\ b::\rho, \text{Int}\ n_1::\text{Int}\ n_2::\sigma, \sigma_h, b::\rho_h)\\
-    \Longleftrightarrow (\rho, \text{Int}\ (n_1 \star n_2)::\sigma, n_1::\sigma_h, b::\rho_h)\\ \\
-    (\text{Roll}\ n::\rho, v_1::v_2::\dots::v_n::\sigma, \sigma_h, \rho_h)\\
-    \Longleftrightarrow (\rho, v_n::v_1::\dots::v_{n-1}::\sigma, \sigma_h, \text{Roll}\ n::\rho_h)\\ \\
-    (\text{Unroll}\ n::\rho, v_1::v_2::\dots::v_n::\sigma, \sigma_h, \rho_h)\\
-    \Longleftrightarrow (\rho, v_2::\dots::v_n::v_1::\sigma, \sigma_h, \text{Unroll}\ n::\rho_h)\\ \\
-    (\text{Form\_Closure}\ (n_v, n_{\rho})::i_1::\dots::i_{n_\rho}::\rho, \sigma, \sigma_h, \rho_h) \\
-    \Longleftrightarrow (\rho, \text{Closure}\ (n_v, i_1::\dots::i_{n_{\rho}})::\sigma, \sigma_h, \text{Form\_Closure}\ (n_v, n_{\rho})::\rho_h)\\ \\
-    (\text{MultiApply}\ n::\rho, \text{Closure} (n, \hat{\rho})::v_1::\dots::v_n::\sigma, \sigma_h, \rho_h) \\
-    \Longleftrightarrow (\hat{\rho}\ @\ \rho, v_1::\dots::v_n @\ \sigma, |\hat{\rho}|::\sigma_h, \text{MultiApply}\ n::\rho_h)
+    (\text{(Add $|$ Subt $|$ Mult $|$ Div as $b$)}::\rho, \text{Int $n_1$}::\text{Int $n_2$}::\sigma, \sigma_f, \sigma_h, b::\rho_h)\\
+    \Longleftrightarrow (\rho, n_1 \star n_2::\sigma, \sigma_f, n_1::\sigma_h, b::\rho_h)
 \end{gather*}
 
-Additionally, every closure has the following property. Essentially, every closure, after executing the body of the closure, consumes its arguments.
+\textbf{Function operations:}
+\begin{gather*}
+    (\text{Save\_Function ($fun\_id, k$) as $sf$}::\hat{\rho}\ @\ \rho, \sigma, \sigma_f, \sigma_h, \rho_h), \text{where $|\hat{\rho}| = k$}\\
+    \Longleftrightarrow (\rho, \sigma, (fun\_id, \hat{\rho})::\sigma_f, \sigma_h, sf::\rho_h)\\ \\
+    (\text{Form\_Closure ($fun\_id$) as $fc$}::\rho, \text{Tuple $(v_1, \dots, v_k)$ as $tup$}::\sigma, \sigma_f, \sigma_h, \rho_h)\\ \text{where List.assoc $fun\_id\ \sigma_f = \hat{\rho}$}\\
+    \Longleftrightarrow (\rho, \text{Closure ($\hat{\rho}, tup$)}::\sigma, \sigma_f, \sigma_h, fc::\rho_h)\\ \\ 
+    (\text{Apply}::\rho, \text{Closure ($\hat{\rho}$, Tuple $(v_1, \dots, v_k)$ as $tup$)}::\arg::\sigma, \sigma_f, \sigma_h, \rho_h),\\     
+    \Longleftrightarrow (\hat{\rho}\ @\ \rho, tup::\arg::\sigma, \sigma_f, |\hat{\rho}|::\sigma_h, fc::\rho_h)
+\end{gather*}
+
+
+\textbf{Roll, Tuple, and Integer Pushing operations:}
+\begin{gather*}
+    (\text{Roll $k$}::\rho, v_1::v_2::\dots::v_k::\sigma, \sigma_f, \sigma_h, \rho_h)\\
+    \Longleftrightarrow (\rho, v_k::v_1::\dots::v_{k-1}::\sigma, \sigma_f, \sigma_h, \text{Roll $k$}::\rho_h)\\ \\
+    (\text{Unroll $k$}::\rho, v_1::v_2::\dots::v_k::\sigma, \sigma_f, \sigma_h, \rho_h)\\
+    \Longleftrightarrow (\rho, v_2::\dots::v_k::v_1::\sigma, \sigma_f, \sigma_h, \text{Unroll $k$}::\rho_h)\\ \\
+    (\text{Compose\_Tuple $k$}::\rho, v_1:: \dots:: v_k::\sigma, \sigma_f, \sigma_h, \rho_h)\\
+    \Longleftrightarrow (\rho, \text{Tuple}(v_1, \dots, v_k)::\sigma, \sigma_f, \sigma_h, \text{Compose\_Tuple $k$}::\rho_h)\\ \\
+    (\text{Decompose\_Tuple $k$}::\rho, \text{Tuple}(v_1, \dots, v_k)::\sigma, \sigma_f, \sigma_h, \rho_h)\\
+    \Longleftrightarrow (\rho, v_1::\dots::v_k::\sigma, \sigma_f, \sigma_h, \text{Decompose\_Tuple $k$}::\rho_h)\\ \\
+    (\text{Push $n$}::\rho, \sigma, \sigma_f, \sigma_h, \rho_h)\\
+    \Longleftrightarrow (\rho, \text{Int $n$}::\sigma, \sigma_f, \sigma_h, \text{Push $n$}::\rho_h)
+\end{gather*}
+
+\section*{Reversability of Apply:}
+
+All the operations change the size of the stack $\sigma$.
 \begin{align*}
-    \vec{\sigma} &= (n, \sigma, \hat{\sigma}\ \text{where} |\hat{\sigma}| = n)\\
-    \vec{\rho} &= (\rho, \hat{\rho})
-\end{align*}
-\begin{align*}
-\textbf{Well-Formed Closure Property}: \\
-    \text{wf} (\vec{\sigma}, \vec{\rho})\ &\myeq\ (\text{MultiApply}\ n::\rho, \text{Closure} (n, \hat{\rho})::\hat{\sigma}::\sigma, \dots)\\
-    &\Longrightarrow (\hat{\rho}\ @\ \rho, \hat{\sigma} @\ \sigma, \dots) \Longrightarrow^* (\rho, v::\sigma, \dots)
-\end{align*}
-
-\iffalse{Now we will discuss the non-injective functions and the approach to maintaining the history tape. When reversing an $\text{Add}$ instruction (or in general an arithmetic binary operation), one cannot uniquely determine two integers whose sum is is the integer at the top of the stack, therefore, when adding $\text{Int}\ n_1$ and $\text{Int}\ n_2$, we place $n_1$ onto the history since the function $(+)\ n_1$ is injective. This is the case for the other binary operations, and for Div,
-the two integers must divide evenly.
-
-Likewise, when reversing an $\text{MultiApply}\ n$ operation, one cannnot uniquely determine which instructions belong in the closure and which stack values are used in the closure, therefore to restore $\text{Closure} (n, \hat{\sigma})$, we must add the lengths of $\hat{\sigma}$ to the history tape upon executing an $\text{MultiApply}\ n$ instruction.
-}
-\fi
-
-\section*{Translation to Stack Machine Instructions:}
-
-Recall that we are working with lifted lambda expressions. All the operations change the size of the stack predictably. Here is how each operation affects the size of the stack:
-\begin{align*}
-    \text {Push}\ i\ &\rightarrow\ +1\\
-    (\text{Add}\ |\ \text{Subt}\ |\ \text{Mult}\ |\ \text{Div})\ &\rightarrow\ -1\\
-    \text{Roll}\ \_\ |\ \text{Unroll}\ \_ \ &\rightarrow\ 0\\
-    \text {Form\_Closure}\ \_\ &\rightarrow\ +1\\
-    \text {MultiApply}\ n\ &\rightarrow\ -n + 1\\
+        (\text{Add}\ |\ \text{Subt}\ |\ \text{Mult}\ |\ \text{Div})\ &\rightarrow\ -1\\
+        \text {Save\_Function} &\rightarrow\ +0\\
+        \text {Form\_Closure} &\rightarrow\ +0\\
+        \text {Apply}\ &\rightarrow\ -1\\
+        \text{Roll}\  |\ \text{Unroll} \ &\rightarrow\ +0\\
+        \text {Compose\_Tuple}\ k\ &\rightarrow\ -k + 1\\
+        \text {Decompose\_Tuple}\ k\ &\rightarrow\ +k - 1\\
+        \text {Push}\ &\rightarrow\ +1\\
 \end{align*}
 
-Notice that Form\_Closure does not take any values from the stack because the body of a $\lambda$-expression contains no free variables. 
 Therefore, we can classify the instructions into grow ops and shrink ops.
 \begin{align*}
-    i_g ::=&\ \text{Push}\ n\ |\ \text{Form\_Closure}\ (n_v, n_{\rho})\\
-    \rho_g ::=&\ i_g\ \text{list}\\
+    i_g ::=& \text{Push | Compose\_Tuple 0 | Decompose\_Tuple $k > 1$}\\
+    \rho_g ::=& \text{$i_g$ list}\\
     i_s ::=&\ \text {Add}\ |\ \text {Subt}\ |\ \text {Mult}\ |\ \text {Div}\\
-    & |\ \text{Roll}\ n\ |\ \text {Unroll}\ n\ |\ \text{MultiApply}\ n\\
+    & |\ \text{Save\_Function \_ | Form\_Closure \_ | Apply}\\
+    & |\ \text{Roll}\ n\ |\ \text {Unroll}\ n\}\\
+    & |\ \text{Compose\_Tuple $k>0$ | Decompose\_Tuple $k \le 1$ | Push \_}\\
     \rho_s ::=&\ i_s\ \text{list}
 \end{align*}
 
 Let us define the following property.
 \begin{align*}
-    \textbf{Grow-Shrink Property}:\\
-    \text{gs}\ (\rho\ \text{where}\ |\rho| > 0)\ \myeq\ \exists \rho_g,\ \rho_s.\ \rho = \rho_g\ @\ \rho_s
+        \textbf{Grow-Shrink Property}:\\
+            \text{gs}\ (\rho\ \text{where}\ |\rho| > 0)\ = \ \exists \rho_g,\ \rho_s.\ \rho = \rho_g\ @\ \rho_s
 \end{align*}
     
-    The translation we produce has important properties that may allow MultiApply to be injective. For every program $\rho$ produced by the translation, gs ($\rho$) holds. Additionally, for every closure Closure ($n, \hat{\rho})$, gs ($\hat{\rho}$) holds. 
-
-The translation is produced using many careful roll and unroll operations. It is defined in compiler.ml.
-
-\section*{Limitations of Lambda-Lifting:}
-
-Unfortunately, not all sample programs provided work properly (sample\_programs/app5\_not\_working.lam). Though the closures in the lambda-lifted expressions have no free variables (and thus empty environments), this does not guarantee that additional closures formed as the result of partial application have empty environments. Consider the following illustrative example of an expression in the target lambda-lifted language.
-\begin{align*}
-    \text{let}\ f\ &=\ (\lambda\ x\ y.\ x + y)\ \text{in}\\
-    \text{let}\ g\ &=\ (\lambda\ f.\ f\ 1)\ \text{in}\\
-    g\ f\ 1
-\end{align*}
-
-After evaluating $(g\ f)$, we produce the closure $\{(\lambda\ x\ y.\ x + y), [x = 1]\}$, which we do not have the capacity to represent in our stack-machine. Allowing such closures may cause the grow-shrink properties outlined in the previous section to no longer hold.
-
-
-\section*{Reversability of MultiApply:}
-
-The $\texttt{MultiApply}$ instruction may be injective because of the linear constraints in our language. Recall that we define the Well-Formed Closure Property and the Grow-Shrink Property. Recall that to reverse $\text{MultiApply}$, we must split the program and the stack such that we restore the original closure. We define this split by the following. The vectors used in these definitions where defined with the Well-Formed Closure Property.
-\begin{align*}
-    \text{splits}\ (\rho', \vec{\rho}, \vec{\sigma})\ \myeq\ \rho' = \hat{\rho}\ @\ \rho\ \wedge : \ \texttt{wf}\ (\vec{\rho}, \vec{\sigma})
-\end{align*}
-If we could prove the following proposition, then $\texttt{MultiApply}$ would be injective.
-\begin{align*}
-    \text{InjApply}: \quad \forall \rho'.\ \exists\ \vec{\rho_a}.\ \text{splits}\ (\rho', \vec{\rho_a}, \vec{\sigma}) \wedge \exists\ \vec{\rho_b}\ \text{splits}\ (\rho', \vec{\rho_b}, \vec{\sigma}) \Longrightarrow \vec{\rho_a} = \vec{\rho_b}
-\end{align*}
-
-In the test cases we have tried, InjApply seems to hold, and here is the pseudocode that finds the appropriate split.
-\begin{align*}
-    \text{let}\ &rev\ n\ (\hat{\rho}, \rho) =\\
-    &\text{if}\ n = 1  \wedge |\hat{\rho}| > 0\\ 
-    &\text{then}\ (\hat{\rho}, \rho)\ \text{else match}\ \rho\ \text{with}\\
-    & \quad \text{$|$ Push \_ as $p::t \rightarrow$ } rev\ (n + 1)\ (p::\hat{\rho}, t)\\
-    & \quad \text{$|$ (Add $|$ Subt $|$ Mult $|$ Div) as $b::t \rightarrow$ } rev\ (n - 1)\ (b::\hat{\rho}, t)\\
-    & \quad \text{$|$ (Unroll \_ $|$ Roll \_) as $r::t \rightarrow$ } rev\ n\ (r::\hat{\rho}, t)\\
-    & \quad \text{$|$ MultiApply $m$ as $ma::t \rightarrow$ } rev\ (n - m)\ (ma::\hat{\rho}, t)
-\end{align*}
-
-There are cases missing from this match, but Form\_Closure is not expected in the body of a closure. If the $n =1$ condition does not hold and $\rho = []$, then reversing MultiApply has failed. Note that we require every closure to have at least one instruction. Otherwise a valid split of $\rho'$ would trivially be $\rho' = []\ @\ \rho'$.
-
-\break{}
-
-To reverse MultiApply $n$ given the program $\rho'$, we call $rev\ n\ ([], \rho')$ which provides the split $\rho' = \hat{\rho_g}\ @ \ \hat{\rho_s}\ @\ \rho$, where $\hat{\rho_g}\ @\ \hat{\rho_s}$ is the body of the closure we aim to restore (recall that this closure body satisfies the Grow-Shrink Property). 
-
-Let $n_0 = n$. Let ${\{n_m\}}_m$ be the sequence of $n$ through the recursive calls, where $n_m$ is the size of the local stack (of the closure) after executing the first $m$ instructions of $\rho'$. Note that each instruction of $\rho_g$ increases $n$ by 1. Therefore, $n_{|\rho_g|} = n + |\rho_g|$. Because our closure is well-formed, after executing $\rho_g\ @\ \rho_s$, all arguments to the closure will be consumed to produce a result value. Therefore, $n_{|\rho_g\ @\ \rho_s|} = 1$. This is by no means a proof, but
-hopefully the explanation provides intuition to the argument that InjApply holds.
-
-\section*{Future Aims:}
-
-We need to prove that the translation from lifted lambda expression to machine operations is sound and that this translation satisfies the Grow-Shrink Property.
-
-Because of the limitations of lifted-lambda expressions, we need to translate our expressions to a target language without partial application.
-
-The injectiveness of MultiApply must be proved rigorously. 
-
+        The translation we produce has important properties that may allow Apply to be injective. For every program $\rho$ produced by the translation, gs ($\rho$) holds. Additionally, for every closure Closure ($n, \hat{\rho})$, gs ($\hat{\rho}$) holds. 
 \end{document}
