@@ -8,6 +8,7 @@
 \textwidth 6in \textheight 8 in
 
 \usepackage{amsmath}
+\usepackage{amssymb}
 \usepackage{upgreek}
 \usepackage{enumerate}
 \usepackage{verbatim}
@@ -116,33 +117,63 @@ The rules we present below show the reversibility for each instruction using the
 
 \section*{Reversability of Apply:}
 
-All the operations change the size of the stack $\sigma$.
+Define $\vec{\rho} = (\hat{\rho}, \rho)$ and $\vec{\sigma} = (\text{Tuple}(v_1, \dots, v_n), \arg, \sigma)$.
 \begin{align*}
-        \text{Add $|$ Subt $|$ Mult $|$ Div}\ &\rightarrow\ -1\\
-        \text {Save\_Function \_}\ &\rightarrow\ +0\\
-        \text {Form\_Closure \_}\ &\rightarrow\ +0\\
-        \text {Apply}\ &\rightarrow\ -1\\
-        \text{Roll \_ $|$ Unroll \_}\ &\rightarrow\ +0\\
-        \text {Compose\_Tuple $k$}\ &\rightarrow\ -k + 1\\
-        \text {Decompose\_Tuple $k$}\ &\rightarrow\ +k - 1\\
-        \text {Push \_}\ &\rightarrow\ +1\\
+    \textbf{Well-Formed Closure Property}: \\
+    \text{wf} (\vec{\rho}, \vec{\sigma})\ &\triangleq\ (\text{Apply::$\rho$, Closure ($\hat{\rho}$, Tuple $(v_1, \dots, v_k)$ as $tup$)::$\arg::\sigma, \dots$})\\
+    &\Longrightarrow (\hat{\rho}\ @\ \rho, tup::\arg::\sigma, \dots) \Longrightarrow^* (\rho, result::\sigma, \dots)
 \end{align*}
 
-Therefore, we can classify the instructions into grow ops and shrink ops.
+All the operations change the size of the stack $\sigma$. We define the function $\delta$ which gives the change in the size of $\sigma$ after executing an instruction.
 \begin{align*}
-    i_g ::=\ & \text{Push \_ $|$ Compose\_Tuple 0 $|$ Decompose\_Tuple $k > 1$}\\
-    \rho_g ::=\ &\text{$i_g$ list}\\
-    i_s ::=\ &\text{Add $|$ Subt $|$ Mult $|$ Div}\\
-    &\text{$|$ Save\_Function \_ $|$ Form\_Closure \_ $|$ Apply}\\
-    &\text{$|$ Roll \_ $|$ Unroll \_ $|$ Compose\_Tuple $k>0$ $|$ Decompose\_Tuple $k \le 1$}\\
-    \rho_s ::=&\ i_s\ \text{list}
+    \delta(\text{Add $|$ Subt $|$ Mult $|$ Div})\ &=\ -1\\
+    \delta(\text {Save\_Function \_})\ &=\ +0\\
+    \delta(\text {Form\_Closure \_})\ &=\ +0\\
+    \delta(\text {Apply})\ &=\ -1\\
+    \delta(\text{Roll \_ $|$ Unroll \_})\ &=\ +0\\
+    \delta(\text {Compose\_Tuple $k$})\ &=\ -k + 1\\
+    \delta(\text {Decompose\_Tuple $k$})\ &=\ +k - 1\\
+    \delta(\text {Push \_})\ &=\ +1\\
 \end{align*}
 
 Let us define the following property.
 \begin{align*}
-        \textbf{Grow-Shrink Property}:\\
-            \text{gs}\ (\rho\ \text{where}\ |\rho| > 0)\ = \ \exists \rho_g,\ \rho_s.\ \rho = \rho_g\ @\ \rho_s
+        \textbf{Grow-Shrink Property}:\\ 
+        \text{gs ($\rho$ where $|\rho| > 0$)}\ \triangleq\ \exists \rho_g,\ \rho_s.\ \rho = \rho_g\ @\ \rho_s
 \end{align*}
-    
-        The translation we produce has important properties that may allow Apply to be injective. For every program $\rho$ produced by the translation, gs ($\rho$) holds. Additionally, for every closure Closure ($n, \hat{\rho})$, gs ($\hat{\rho}$) holds. 
+
+Recall that to reverse Apply, we must split the program such that we restore the instructions in the original closure. Currently, we must store the length of the instructions in the closure body to reverse Apply. We define this split as follows.
+\begin{align*}
+    \text{splits}\ (\vec{\rho},\vec{\sigma})\ \triangleq\ \rho' = \hat{\rho}\ @\ \rho\ \wedge : \ \texttt{wf}\ (\vec{\rho}, \vec{\sigma})
+\end{align*}
+If the following proposition holds, then Apply would be injective.
+\begin{align*}
+    \text{InjApply}: \quad \forall \rho', \vec{\sigma}.\ \exists\ \vec{\rho^a}.\ \text{splits}\ (\vec{\rho^a}, \sigma) \wedge \exists\ \vec{\rho^b}.\ \text{splits}\ (\vec{\rho^b}, \vec{\sigma}) \Longrightarrow \vec{\rho^a} = \vec{\rho^b}
+\end{align*}
+
+\textbf{More definitions:}
+
+Let $\Phi(\rho)$ = \text{List.fold\_left (fun sum instr.\ acc + $\delta$ (instr)) 0 $\rho$}. Note that for $\hat{\rho}$ the body of a well formed closure, $$\Phi(\hat{\rho}) = -1.$$
+
+Furthermore, for any  any $\hat{\rho} = \hat{\rho}_g\ @\ \hat{\rho}_s$, $$\Phi(\hat{\rho}_g) = \alpha \ge 0, \qquad \Phi(\hat{\rho}_s) = - \alpha - 1.$$
+
+\textbf{Proof of InjApply:}
+
+Let $\vec{\sigma}$. Suppose, for a contradiction, there exist $\vec{\rho^a} \neq \vec{\rho^b}$ such that splits $(\vec{\rho^a}, \vec{\sigma})$ and splits $(\vec{\rho^b}, \vec{\sigma})$. Assuming the grow shrink property holds for $\hat{\rho}^a$ and $\hat{\rho}^b$, $$\hat{\rho}^a = \hat{\rho}_g^a\ @\ \hat{\rho}_s^a, \qquad \hat{\rho}^b = \hat{\rho}_g^b\ @\ \hat{\rho}_s^b.$$
+
+TODO $\hat{\rho}_g^a = \hat{\rho}_g^b$.\\
+
+Assume $\Phi(\hat{\rho}_g^a) = \alpha$. Then $\Phi(\hat{\rho}_s^a) = \Phi(\hat{\rho}_s^b) = - \alpha - 1$.
+
+Then $\hat{\rho}_s^b = \hat{\rho}_s^a\ @\ \rho^*$, and $\Phi(\rho^*) = 0$ (more clearly, the instructions in $\rho^*$ do not change the size of the stack). \\
+
+TODO guarantee that our compiler will not produce closure body programs with end with instructions that do not change the size of the stack.
+
+
+
+
+
+
+
+
 \end{document}
