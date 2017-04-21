@@ -1,0 +1,149 @@
+\documentclass[9pt]{article}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{upgreek}
+\usepackage{enumitem}
+\usepackage{verbatim}
+\usepackage{stmaryrd}
+\usepackage{listings}
+\usepackage[margin = 0.5in]{geometry}
+
+\newcommand*{\br}[1]{\llbracket{#1}\rrbracket}
+\renewcommand*{\int}{\text{int}}
+\newcommand*{\apply}{\text{apply}}
+
+\begin{document}
+\title{Linear Lambda Calculus Proofs}
+\author{Anna Yesypenko}
+\maketitle
+
+\textbf{Linear type system}
+\begin{align*}
+    t\ ::=\ \int\ |\ t_1 \rightarrow t_2
+\end{align*}
+
+\textbf{Source language}
+\begin{align*}
+    s\ ::=&\ x\\
+    &|\ n\\
+    &|\ \lambda x.s\\
+    &|\ s_1\ s_2\\
+    &|\ \text{let $x = s_1$ in $s_2$}\\
+    &|\ s_1\ b\ s_2\\
+    v\ ::=&\ n\\
+    &|\ \lambda x.s
+\end{align*}
+
+We define operational semantics for source language.
+\begin{gather*}
+    \frac{}{v \Downarrow v} \text{[E-Value]} \qquad
+    \frac{s_1 \Downarrow n_1 \qquad s_2 \Downarrow n_2}{s_1\ b\ s_2 \Downarrow n_1\ b\ n_2} \text{[E-Const]}\\ \\
+    \frac{s_1 \Downarrow \lambda x.s \qquad s_2 \Downarrow v \qquad s[v/x] \Downarrow v'}{s_1\ s_2 \Downarrow v'} \text{[E-Apply]} \qquad 
+    \frac{s_1 \Downarrow v \qquad s_2[v/x] \Downarrow v'}{\text{let $x = s_1$ in $s_2$} \Downarrow v'}\text{[E-Let]}
+\end{gather*}
+
+We write type judgements for the source language as $G \vdash s : t$.
+\begin{gather*}
+    \frac{}{x: t \vdash x: t} \text{[T-Var]} \qquad
+    \frac{}{\vdash n : \int} \text{[T-Int]}\\ \\
+    \frac{G, x: t_1 \vdash s : t_2}{G \vdash \lambda x.s : t_1 \rightarrow t_2} (x \notin G)\ \text{[T-Lam]} \qquad
+    \frac{G_1 \vdash s_1 : t_1 \rightarrow t_2 \qquad G_2 \vdash s_2: t_1}{G_1, G_2 \vdash s_1\ s_2 : t_2} \text{[T-App]}\\ \\
+    \frac{G_1 \vdash s_1 : t_1 \qquad G_2, x:t_1 \vdash s_2: t_2}{G_1, G_2 \vdash \text{let $x = s_1$ in $s_2$}: t_2} (x \notin G_2)\ \text{[T-Let]} \qquad
+    \frac{G_1 \vdash s_1 : \int \qquad G_2 \vdash s_2 : \int}{G_1, G_2 \vdash s_1\ b\ s_2 : \int} \text{[T-Const]}
+\end{gather*}
+
+\textbf{Target Language}
+\begin{align*}
+    e\ ::=&\ x\\
+    &|\ n\\
+    &|\ C_{\lambda (x_1, \dots, x_N) x.e} (e_1, \dots, e_N)\\
+    &|\ \apply (e_1, e_2)\\
+    &|\ b (e_1, e_2)\\
+    v\ ::=&\ n\\
+    &|\ C_{\lambda (x_1, \dots, x_N) x.e} (v_1, \dots, v_N)\\
+\end{align*}
+
+We define the operational semantics for the target language.
+\begin{gather*}
+    \frac{}{n \Downarrow n} \text{[E-Int]} \qquad
+    \frac{e_1 \Downarrow n_1 \qquad e_2 \Downarrow n_2}{b(e_1, e_2) \Downarrow n_1\ b\ n_2} \text{[E-Const]}\\ \\
+    \frac{e_1 \Downarrow v_1, \dots, e_N \Downarrow v_N}{C_{\lambda (x_1, \dots, x_N) x.e} (e_1, \dots, e_N) \Downarrow C_{\lambda (x_1, \dots, x_N) x.e} (v_1, \dots, v_N)} \text{[E-Closure]}\\ \\
+    \frac{e_1 \Downarrow C_{\lambda (x_1, \dots, x_N) x.e} (v_1, \dots, v_N) \qquad e_2 \Downarrow v \qquad e[v_1/x_1, \dots, v_N/x_N, v/x] \Downarrow v'}{\apply (e_1, e_2) \Downarrow v'}\text{[E-Apply]}
+\end{gather*}
+
+We write type judgements for the target language as $G \vdash e : t$.
+\begin{gather*}
+    \frac{}{x: t \vdash x: t} \text{[T-Var]} \qquad
+    \frac{}{\vdash n : \int} \text{[T-Int]}\\ \\
+    \frac{G_1 \vdash e_1 : t_1, \dots, G_N \vdash e_N: t_N}{G_1, \dots, G_N \vdash (e_1, \dots, e_N): t_1 * \dots * t_N}\text{[T-Tup]} \qquad
+    \frac{G, x:t_1 \vdash e : t_2}{G \vdash \lambda x.e : t_1 \rightarrow t_2}\text{[T-Lam]}\\ \\
+    \frac{\vdash \lambda (x_1,\dots,x_N) x.e: t_1 * \dots * t_N \rightarrow t_{N+1} \rightarrow t_{N+2} \qquad G \vdash (e_1, \dots, e_N) : t_1 * \dots * t_N}{G \vdash C_{\lambda (x_1, \dots, x_N) x.e} (e_1, \dots, e_N): t_{N+1} \rightarrow t_{N+2}} \text{[T-Clos]}\\ \\
+    \frac{G_1 \vdash e_1 : t_1 \rightarrow t_2 \qquad G_2 \vdash e_2: t_1}{G_1, G_2 \vdash \apply(e_1, e_2) : t_2} \text{[T-App]}\qquad
+    \frac{G_1 \vdash e_1 : \int \qquad G_2 \vdash e_2 : \int}{G_1, G_2 \vdash b(e_1, e_2) : \int} \text{[T-Const]}
+\end{gather*}
+
+\textbf{Translation from Source Language to Target Language}
+\begin{align*}
+    \br{x} &= x\\
+    \br{n} &= n\\
+    \br{\lambda x.s} &= C_{\lambda (x_1, \dots, x_N)x.\br{s}}(x_1, \dots, x_N), \text{where $x_1, \dots, x_N$ are the free variables of $\br{s}$}\\
+    \br{s_1\ s_2} &= \apply (\br{s_1}, \br{s_2})\\
+    \br{\text{let $x = s_1$ in $s_2$}} &= \br{(\lambda x.s_2) s_1}\\
+    \br{s_1\ b\ s_2} &= b(\br{s_1},\br{s_2})
+\end{align*}
+\textbf{Proofs on Translation}
+
+If $\br{s} = e$, then
+\begin{enumerate}[label= (\alph*)]
+    \item \lbrack{}Semantics Preserving\rbrack{} $s \Downarrow_s v$ implies $e \Downarrow v'$, where $v \sim v'$.
+    \item \lbrack{}Type Preserving\rbrack{} $G \vdash s:t$ implies $G \vdash e:t$.
+\end{enumerate}
+
+\textbf{Semantics Preserving:}
+
+First we define the relation $\sim$ between values of the source and target languages. $$v_s \sim v_t\ \Leftrightarrow\ v_s \equiv f\br{v_t},$$ where $\equiv$ is syntactical equivalence between values of the source language. We define $f\br{\cdot}$ as $$f\br{n} = n \qquad f\br{C_{\lambda (x_1, \dots, x_N)x.e}(v_1, \dots, v_N)} = (\lambda x.f\br{e})[v_i/x_i].$$
+
+\textbf{Lemma:} Assuming $\lambda x.s \sim C_{\lambda (x_1, \dots, x_N)x.e}(v_1, \dots, v_N)$ and $v_s \sim v_t$, then $(\lambda x.s)\ v \Downarrow v'$ and $\text{apply}(C_{\lambda (x_1, \dots, x_N)x.e}(v_1, \dots, v_N), v) \Downarrow v''$ implies that $v \sim v'$. 
+
+Since $\lambda x.s \equiv (\lambda x.f\br{e})[\forall i.v_i/x_i]$ and the relation $\equiv$ is inductively defined, $s \equiv f\br{e}[\forall i.v_i/x_i]$. According to the [E-Apply] rule in the target and source languages, function application is completed by substituting the argument for $x$ in the function body. Therefore, since $v_s \equiv f\br{v_t}$, we conclude $$s[v_s/x] \equiv f\br{e}[\forall i.v_i/x_i, f\br{v_t}/x].\blacksquare$$
+\begin{itemize}
+    \item Assume $\dfrac{}{n \Downarrow n}$ and $\br{n} = n$.
+        
+        We conclude $n \Downarrow n$ trivially using [E-Int] and $n \equiv n$.
+
+    \item Assume $\dfrac{}{\lambda x.s \Downarrow \lambda x.s}$ and $\br{\lambda x.s} = C_{\lambda (x_1, \dots, x_N)x.e} (x_1, \dots, x_N)$. 
+
+        Since $\lambda x.s$ is a closed expression, there are no free variables. Therfore $\br{\lambda x.s} = C_{\lambda ()x.e}()$. Trivially, we can conclude $C_{\lambda ()x.e}() \Downarrow C_{\lambda ()x.e}()$ using [E-Closure]. By the inductive hypothesis, $s \equiv f(e)$, so $\lambda x.e \equiv \lambda x.f(e)$ trivially.
+    \item Assume $\dfrac{s_1 \Downarrow \lambda x.s \qquad s_2 \Downarrow v \qquad s[v/x] \Downarrow v'}{s_1\ s_2 \Downarrow v'}$ and $\br{s_1\ s_2} = \text{apply}(\br{s_1}, \br{s_2})$.
+
+\end{itemize} 
+
+\textbf{Type Preserving:}
+\begin{itemize}
+    \item Assume $\dfrac{}{x:t \vdash_s x:t}$ and $\br{x} = x$.
+
+        We conclude $x:t \vdash x:t$ trivially using [T-Var].
+    \item Assume $\dfrac{}{\vdash_s n:\int}$ and $\br{n} = n$.
+
+        We conclude $\vdash n:\int$ trivially using [T-Int].
+    \item Assume $\dfrac{G, x:t_{N+1} \vdash s: t_{N+2}}{G \vdash_s \lambda x.s: t_{N+1} \rightarrow t_{N+2}}$ and $\br{\lambda x.s} = C_{\lambda (x_1, \dots, x_N) x.\br{s}} (x_1, \dots, x_N)$.
+
+        Let $G = x_1:t_1, \dots, x_N:t_N$ and $\br{s} = e$. By the inductive hypothesis, we can assume $G, x:t_{N+1} \vdash e:t_{N+2}$. With these assumptions in mind, we illustrate a proof tree.
+        \begin{gather*}
+            \dfrac{\dfrac{\dfrac{\forall i \in [1, n]\dfrac{}{x_i:t_i \vdash x_i: t_i}\text{[T-Var]}}
+                {G \vdash (x_1, \dots, x_N): t_1 * \dots * t_N} \text{[T-Tup]} \qquad
+                \dfrac{G, x:t_{N+1} \vdash e:t_{N+2}}{G \vdash \lambda x.e:t_{N+1} \rightarrow t_{N+2}}\text{[T-Lam]}}
+                {\vdash \lambda (x_1, \dots, x_n) x.e: t_1 * \dots *t_N \rightarrow t_{N+1} \rightarrow t_{N+2}}\text{[T-Lam]} \qquad 
+                \dfrac{\vdots}{G \vdash (x_1, \dots, x_N): t_1 * \dots * t_N}}
+                {G \vdash C_{\lambda (x_1, \dots, x_N)x.e}(x_1, \dots, x_N): t_{N+1} \rightarrow t_{N+2}}\text{[T-Clos]}
+        \end{gather*}
+    \item Assume $\dfrac{G_1 \vdash s_1: t_1 \rightarrow t_2 \qquad G_2 \vdash s_2:t_1}{G_1, G_2 \vdash s_1\ s_2:t_2}$ and $\br{s_1\ s_2} = \text{apply}(\br{s_1}, \br{s_2})$.
+
+        Let $\br{s_1} = e_1$ and $\br{s_2} = e_2$. By the inductive hypothesis, $G_1 \vdash e_1: t_1 \rightarrow t_2$ and $G_2 \vdash e_2: t_1$. Applying [T-App], we conclude $G_1, G_2 \vdash \text{apply}(e_1, e_2):t_2$. 
+    \item Assume $\dfrac{G_1 \vdash s_1: \int \qquad G_2 \vdash s_2:\int}{G_1, G_2 \vdash s_1\ b\ s_2:\int}$ and $\br{s_1\ b\ s_2} = b(\br{s_1}, \br{s_2})$.
+        
+        Let $\br{s_1} = e_1$ and $\br{s_2} = e_2$. By the inductive hypothesis, $G_1 \vdash e_1: \int$ and $G_2 \vdash e_2: \int$. Applying [T-Const], we conclude $G_1, G_2 \vdash b(e_1, e_2):\int$. 
+\end{itemize}
+
+\end{document}
