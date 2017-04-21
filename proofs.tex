@@ -76,9 +76,13 @@ We write type judgements for the target language as $G \vdash e : t$.
 \begin{gather*}
     \frac{}{x: t \vdash x: t} \text{[T-Var]} \qquad
     \frac{}{\vdash n : \int} \text{[T-Int]}\\ \\
-    \frac{G_1 \vdash e_1 : t_1, \dots, G_N \vdash e_N: t_N}{G_1, \dots, G_N \vdash (e_1, \dots, e_N): t_1 * \dots * t_N}\text{[T-Tup]} \qquad
-    \frac{G, x:t_1 \vdash e : t_2}{G \vdash \lambda x.e : t_1 \rightarrow t_2}\text{[T-Lam]}\\ \\
-    \frac{\vdash \lambda (x_1,\dots,x_N) x.e: t_1 * \dots * t_N \rightarrow t_{N+1} \rightarrow t_{N+2} \qquad G \vdash (e_1, \dots, e_N) : t_1 * \dots * t_N}{G \vdash C_{\lambda (x_1, \dots, x_N) x.e} (e_1, \dots, e_N): t_{N+1} \rightarrow t_{N+2}} \text{[T-Clos]}\\ \\
+    \frac{G_1 \vdash e_1 : t_1, \dots, G_N \vdash e_N: t_N}{G_1, \dots, G_N \vdash (e_1, \dots, e_N): t_1 * \dots * t_N}\text{[T-Tup]} \\ \\
+    %
+    \frac{x_1 : t_1, \dots, x_N : t_N, x_{N+1} : t_{N+1} \vdash e : t_{N+2} \qquad
+          G \vdash (e_1, \dots, e_N) : t_1 * \dots * t_N}
+         {G \vdash C_{\lambda (x_1, \dots, x_N) x.e} (e_1, \dots, e_N): t_{N+1} \rightarrow t_{N+2}} \text{[T-Clos]}\\
+    \\
+%
     \frac{G_1 \vdash e_1 : t_1 \rightarrow t_2 \qquad G_2 \vdash e_2: t_1}{G_1, G_2 \vdash \apply(e_1, e_2) : t_2} \text{[T-App]}\qquad
     \frac{G_1 \vdash e_1 : \int \qquad G_2 \vdash e_2 : \int}{G_1, G_2 \vdash b(e_1, e_2) : \int} \text{[T-Const]}
 \end{gather*}
